@@ -129,12 +129,12 @@ class config_get(object):
     @staticmethod
     def move_configuration_file_old():
         print("移动配置文件")
-        os.system("cp /ql/repo/yuxian158_check/check.sample.toml /ql/config/check.toml")
+        os.system("cp /ql/repo/cddjr_check/check.sample.toml /ql/config/check.toml")
 
     @staticmethod
     def move_configuration_file_new():
         print("移动配置文件")
-        os.system("cp /ql/data/repo/yuxian158_check/check.sample.toml /ql/data/config/check.toml")
+        os.system("cp /ql/data/repo/cddjr_check/check.sample.toml /ql/data/config/check.toml")
 
     @staticmethod
     def get_value_for_toml(toml_path, key):
@@ -236,7 +236,7 @@ class check(object):
         return wrapper
 
 
-def change_cron_new(cron_file_path="/ql/data/db/database.sqlite", repositories="yuxian158_check"):
+def change_cron_new(cron_file_path="/ql/data/db/database.sqlite", repositories="cddjr_check"):
     print("尝试修改定时时间")
     os.system(f"cp {cron_file_path} {cron_file_path}.back")
     con = sqlite3.connect(cron_file_path)
@@ -260,7 +260,7 @@ def change_cron_new(cron_file_path="/ql/data/db/database.sqlite", repositories="
     con.close()
 
 
-def change_cron_old(cron_file_path="/ql/db/crontab.db", repositories="yuxian158_check"):
+def change_cron_old(cron_file_path="/ql/db/crontab.db", repositories="cddjr_check"):
     print("尝试修改定时时间")
 
     def change_time(time_str: str):

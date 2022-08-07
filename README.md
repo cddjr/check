@@ -2,10 +2,10 @@
 <h1 align="center">签到盒青龙版</h1>
 </div>
 
-![GitHub stars](https://img.shields.io/github/stars/yuxian158/check?style=flat-square)
-![GitHub forks](https://img.shields.io/github/forks/yuxian158/check?style=flat-square)
-![GitHub issues](https://img.shields.io/github/issues/yuxian158/check?style=flat-square)
-![GitHub issues](https://img.shields.io/github/languages/code-size/yuxian158/check?style=flat-square)
+![GitHub stars](https://img.shields.io/github/stars/cddjr/check?style=flat-square)
+![GitHub forks](https://img.shields.io/github/forks/cddjr/check?style=flat-square)
+![GitHub issues](https://img.shields.io/github/issues/cddjr/check?style=flat-square)
+![GitHub issues](https://img.shields.io/github/languages/code-size/cddjr/check?style=flat-square)
 
 
 # 一个运行在青龙的签到函数
@@ -40,7 +40,7 @@
 
 该文件夹下是 [sitoi/dailycheckin](https://github.com/sitoi/dailycheckin) 该项目的全部支持脚本
 
-[配置方式查看](https://github.com/yuxian158/check/blob/master/dailycheckin_scripts/README.md)
+[配置方式查看](https://github.com/cddjr/check/blob/master/dailycheckin_scripts/README.md)
 
 AcFun | 百度搜索资源平台 | Bilibili | 天翼云盘 | CSDN | 多看阅读 | 恩山论坛 | Fa米家 | 网易云游戏 | 葫芦侠 | 爱奇艺 | 全民K歌 | MEIZU 社区 | 芒果 TV | 小米运动 | 网易云音乐 | 一加手机社区官方论坛 | 哔咔漫画 | 吾爱破解 | 什么值得买 | 百度贴吧 | V2EX | 腾讯视频 | 微博 | 联通沃邮箱 | 哔咔网单 | 王者营地 | 有道云笔记 | 智友邦 | 机场签到 | 欢太商城 | NGA | 掘金 | GLaDOS | HiFiNi | 时光相册 | 联通营业厅
 
@@ -55,19 +55,19 @@ AcFun | 百度搜索资源平台 | Bilibili | 天翼云盘 | CSDN | 多看阅读
 只使用dailycheckin_scripts：
 
 ```
-ql repo https://github.com/yuxian158/check.git "ck_" "" "checksend|utils"
+ql repo https://github.com/cddjr/check.git "ck_" "" "checksend|utils"
 ```
 
 只使用others_scripts：
 
 ```
-ql repo https://github.com/yuxian158/check.git "oc_" "" "checksend|utils"
+ql repo https://github.com/cddjr/check.git "oc_" "" "checksend|utils"
 ```
 
 我全都要:
 
 ```
-ql repo https://github.com/yuxian158/check.git "ck_|oc_" "" "checksend|utils"
+ql repo https://github.com/cddjr/check.git "ck_|oc_" "" "checksend|utils"
 ```
 
 ### 2.运行以下命令
@@ -75,13 +75,13 @@ ql repo https://github.com/yuxian158/check.git "ck_|oc_" "" "checksend|utils"
 旧版(青龙v2.12以下)
 
 ```shell
-cd /ql/repo/yuxian158_check && python3 utils.py
+cd /ql/repo/cddjr_check && python3 utils.py
 ```
 
 新版
 
 ```shell
-cd /ql/data/repo/yuxian158_check && python3 utils.py
+cd /ql/data/repo/cddjr_check && python3 utils.py
 ```
 
 然后不出意外的话你可以在青龙面板的配置文件下找到check.toml或check.json文件
@@ -180,5 +180,5 @@ export MI_PUSH_ALIAS="********"
 
 ## Stargazers over time
 
-[![Stargazers over time](https://starchart.cc/yuxian158/check.svg)](https://starchart.cc/yuxian158/check)
+[![Stargazers over time](https://starchart.cc/cddjr/check.svg)](https://starchart.cc/cddjr/check)
 

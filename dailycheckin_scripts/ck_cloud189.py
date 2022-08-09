@@ -160,5 +160,4 @@ def main(*args, **kwargs):
 
 
 if __name__ == "__main__":
-    # main()
-    print(Cloud189(check_item={'cloud189_phone': '17735745982', 'cloud189_password': 'Zl159753123'}).main())
+    main()

@@ -49,14 +49,14 @@ class Meizu:
             "accept-language": "zh-CN,zh;q=0.9",
             "cookie": cookie,
         }
-        data = {"mod": "index", "action": "draw", "id": "2"}
+        draw_data = {"mod": "index", "action": "draw", "id": "2"}
         award_list = []
         success_count = 0
         error_count = 0
         if count:
             for i in range(count):
                 try:
-                    data = requests.post(url="https://bbs-act.meizu.cn/index.php", headers=headers, data=data).json()
+                    data = requests.post(url="https://bbs-act.meizu.cn/index.php", headers=headers, data=draw_data).json()
                     if data["code"] == 200:
                         one_msg = data.get("data", {}).get("award_name")
                         award_list.append(one_msg)

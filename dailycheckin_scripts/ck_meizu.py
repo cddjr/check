@@ -62,11 +62,18 @@ class Meizu:
                         award_list.append(one_msg)
                         success_count += 1
                     else:
+                        if data["code"] == 205:
+                            one_msg = "没有中奖" # data.get("message")
+                        elif data["code"] == 402:
+                            one_msg = "机会用完"
+                            error_count = count - success_count - error_count
+                            break
+                        else:
+                            print(data.get("code"), data.get("message"))
+                            one_msg = "抽奖失败"
                         error_count += 1
-                        print(data.get("code"), data.get("message"))
-                        one_msg = "抽奖失败"
                 except Exception as e:
-                    one_msg = f"抽奖失败: {e}"
+                    one_msg = f"抽奖出错: {e}"
                     error_count += 1
                 print(f"第{i + 1}次抽奖结果：" + str(one_msg))
                 time.sleep(5)

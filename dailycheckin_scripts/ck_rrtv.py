@@ -18,15 +18,14 @@ class RRTV:
     # activity_userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 App/RRSPApp platform/iPhone AppVersion/1.12"
     api_host = "https://api.rr.tv"
 
-    activity_host = api_host + "/rrtv-activity/sign"
-    activity_path_sign = "/sign"
-    activity_path_getinfo = "/getInfo"
-    activity_path_openBag = "/openBag"
-    activity_path_listreward = "/getAllBagItemMaterial"
+    activity_url_sign = api_host + "/rrtv-activity/sign/sign"
+    activity_url_getinfo = api_host + "/rrtv-activity/sign/getInfo"
+    activity_url_openBag = api_host + "/rrtv-activity/sign/openBag"
+    activity_url_listreward = api_host + "/rrtv-activity/sign/getAllBagItemMaterial"
+    activity_url_reflashCard = api_host + "/rrtv-activity/sign/reflashUserCard"
 
-    taskcenter_host = api_host + "/v3plus/taskCenter"
-    taskcenter_path_openbox = "/openBox"
-    taskcenter_path_listbox = "/index"
+    taskcenter_url_openbox = api_host + "/v3plus/taskCenter/openBox"
+    taskcenter_url_listbox = api_host + "/v3plus/taskCenter/index"
 
     """
     API定义     https://img.rr.tv/rrsp/0.1.0/js/main.1641814753479.js
@@ -67,8 +66,7 @@ class RRTV:
         """
         rewards = []  # {"code":"x", "name":"apple"}
         try:
-            obj = self.__postRequest(
-                self.activity_host + self.activity_path_listreward, "")
+            obj = self.__postRequest(self.activity_url_listreward, "")
             if obj["code"] == "0000":
                 # isinstance(data, list)
                 print("礼盒中的奖品列表")
@@ -93,7 +91,7 @@ class RRTV:
         msg = []
         try:
             obj = self.__postRequest(
-                self.taskcenter_host + self.taskcenter_path_openbox, f"boxId={id}")
+                self.taskcenter_url_openbox, f"boxId={id}")
             if obj["code"] == "0000":
                 box = obj["data"]["boxs"][0]
                 reward = f'{box.get("rewardName")}+{box.get("rewardNum")}'
@@ -114,8 +112,7 @@ class RRTV:
         """
         msg = []
         try:
-            obj = self.__postRequest(
-                self.taskcenter_host + self.taskcenter_path_listbox, "")
+            obj = self.__postRequest(self.taskcenter_url_listbox, "")
             if obj["code"] == "0000":
                 ap = obj["data"]["activePoint"]
                 msg += [{"name": "今日活跃度", "value": ap}]
@@ -154,8 +151,7 @@ class RRTV:
         msg = []
         rewards = self.__getRewardList()
         try:
-            obj = self.__postRequest(
-                self.activity_host + self.activity_path_openBag, "")
+            obj = self.__postRequest(self.activity_url_openBag, "")
             if obj["code"] == "0000":
                 materialCode = obj["data"]["materialCode"]
                 for reward in rewards:
@@ -174,6 +170,33 @@ class RRTV:
             msg += [{"name": "\t抽奖异常", "value": f"请检查接口 {e}"}]
         return msg
 
+    def __getCheckinInfo(self):
+        try:
+            obj = self.__postRequest(self.activity_url_getinfo, "")
+            if obj["code"] == "0000":
+                return obj["data"]
+            else:
+                print(f'获取签到失败: code:{obj["code"]}, msg:{obj["msg"]}')
+        except Exception as e:
+            print(f"获取签到异常: {e}")
+        return {}
+
+    def __resetCard(self, id):
+        """
+        重置剧本
+        """
+        try:
+            obj = self.__postRequest(
+                self.activity_url_reflashCard, f"cardDetailId={id}")
+            if obj["code"] == "0000":
+                print(f'重置剧本{id}成功')
+                return True
+            else:
+                print(f'重置剧本{id}失败: code:{obj["code"]}, msg:{obj["msg"]}')
+        except Exception as e:
+            print(f"重置剧本{id}异常: {e}")
+        return False
+
     def getSignInfo(self):
         """
         获取当前签到的信息
@@ -183,27 +206,37 @@ class RRTV:
         msg = []
         canDraw = False
         try:
-            obj = self.__postRequest(
-                self.activity_host + self.activity_path_getinfo, "")
-            if obj["code"] == "0000":
-                data = obj["data"]
-                signDetailList = data.get("signDetailList", [])
-                if len(signDetailList) > 0:
-                    continueDays = str(
-                        signDetailList[0].get("continueDays", "-1"))
-                    msg += [{"name": "已连续签到", "value": f"{continueDays}天"}]
-                if data.get("canOpenBag", False) == True and data.get("isOpenBag", True) == False:
-                    # 本周没有抽过，可以抽奖
-                    canDraw = True
-                msg += [{"name": "是否可抽奖", "value": "是" if canDraw else "否"}]
-                print(f'是否可抽奖: {"是" if canDraw else "否"}')
-            else:
-                msg += [{"name": "获取信息失败",
-                         "value": f'code:{obj["code"]}, msg:{obj["msg"]}'}]
-                print(f'获取信息失败: code:{obj["code"]}, msg:{obj["msg"]}')
+            data = self.__getCheckinInfo()
+            signDetailList = data.get("signDetailList", [])
+            if len(signDetailList) > 0:
+                continueDays = str(signDetailList[0].get("continueDays", "-1"))
+                msg += [{"name": "已连续签到", "value": f"{continueDays}天"}]
+            while data.get("canOpenBag") == False and int(data.get("diceCount", 0)) > 0:
+                # 剧本不满足抽奖条件，但可以用骰子重置剧本
+                msg += [{"name": "当前骰子", "value": f'{data.get("diceCount")}个'}]
+                print(f'当前骰子: {data.get("diceCount")}个')
+                sleep(6)
+                resetSucc = False
+                for card in data.get("cardDetailList", []):
+                    if card.get("showDice") == True:
+                        # 这个剧本可以用骰子换一个
+                        resetSucc = self.__resetCard(card["id"])
+                        break
+                msg += [{"name": "重置剧本", "value": "成功" if resetSucc else "失败"}]
+                if resetSucc:
+                    # 如果重置成功 则再循环一次判断
+                    data = self.__getCheckinInfo()
+                else:
+                    # 重置失败 放弃
+                    break
+            if data.get("canOpenBag") == True and data.get("isOpenBag") == False:
+                # 本周没有抽过，可以抽奖
+                canDraw = True
+            msg += [{"name": "是否可抽奖", "value": "是" if canDraw else "否"}]
+            print(f'是否可抽奖: {"是" if canDraw else "否"}')
         except Exception as e:
-            print(f"获取信息异常: {e}")
-            msg += [{"name": "获取信息异常", "value": f"请检查接口 {e}"}]
+            print(f"获取签到异常: {e}")
+            msg += [{"name": "获取签到异常", "value": f"请检查接口 {e}"}]
 
         return msg, canDraw
 
@@ -215,8 +248,7 @@ class RRTV:
         """
         msg = []
         try:
-            obj = self.__postRequest(
-                self.activity_host + self.activity_path_sign, "dayOffset=0")
+            obj = self.__postRequest(self.activity_url_sign, "dayOffset=0")
             if obj["code"] == "0000":  # 8650应该是补签成功的返回码 8751是补签条件不满足
                 msg += [{"name": "每日签到", "value": f"成功"}]
                 print("签到成功")

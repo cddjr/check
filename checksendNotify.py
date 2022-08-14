@@ -14,6 +14,18 @@ import urllib.parse
 import requests
 import tomli
 
+# from utils_env import get_file_path
+
+link_reg = re.compile(r"<a href=['|\"](.+)['|\"]>(.+)<\s?/a>")
+bold_reg = re.compile(r"<b>\s*(.+)\s*<\s?/b>")
+list_reg = re.compile(r"^(\d+\.|-)\s.+$")
+
+
+def html2md(content: str) -> str:
+    content = "\n".join(map(lambda x: x if list_reg.fullmatch(x) else x + "\n", content.split("\n")))
+    return bold_reg.sub(r"### **\1**", link_reg.sub(r"[\2](\1)", content))
+
+
 # 原先的 print 函数和主线程的锁
 _print = print
 mutex = threading.Lock()
@@ -31,48 +43,48 @@ def print(text, *args, **kw):
 # 通知服务
 # fmt: off
 push_config = {
-    'HITOKOTO': True,  # 启用一言（随机句子）
+    'HITOKOTO': False,                  # 启用一言（随机句子）
 
-    'BARK_PUSH': '',  # bark IP 或设备码，例：https://api.day.app/DxHcxxxxxRxxxxxxcm
-    'BARK_ARCHIVE': '',  # bark 推送是否存档
-    'BARK_GROUP': '',  # bark 推送分组
-    'BARK_SOUND': '',  # bark 推送声音
+    'BARK_PUSH': '',                    # bark IP 或设备码，例：https://api.day.app/DxHcxxxxxRxxxxxxcm
+    'BARK_ARCHIVE': '',                 # bark 推送是否存档
+    'BARK_GROUP': '',                   # bark 推送分组
+    'BARK_SOUND': '',                   # bark 推送声音
 
-    'CONSOLE': True,  # 控制台输出
+    'CONSOLE': True,                    # 控制台输出
 
-    'DD_BOT_SECRET': '',  # 钉钉机器人的 DD_BOT_SECRET
-    'DD_BOT_TOKEN': '',  # 钉钉机器人的 DD_BOT_TOKEN
+    'DD_BOT_SECRET': '',                # 钉钉机器人的 DD_BOT_SECRET
+    'DD_BOT_TOKEN': '',                 # 钉钉机器人的 DD_BOT_TOKEN
 
-    'FSKEY': '',  # 飞书机器人的 FSKEY
+    'FSKEY': '',                        # 飞书机器人的 FSKEY
 
-    'GOBOT_URL': '',  # go-cqhttp
-    # 推送到个人QQ：http://127.0.0.1/send_private_msg
-    # 群：http://127.0.0.1/send_group_msg
-    'GOBOT_QQ': '',  # go-cqhttp 的推送群或用户
-    # GOBOT_URL 设置 /send_private_msg 时填入 user_id=个人QQ
-    #               /send_group_msg   时填入 group_id=QQ群
-    'GOBOT_TOKEN': '',  # go-cqhttp 的 access_token
+    'GOBOT_URL': '',                    # go-cqhttp
+                                        # 推送到个人QQ：http://127.0.0.1/send_private_msg
+                                        # 群：http://127.0.0.1/send_group_msg
+    'GOBOT_QQ': '',                     # go-cqhttp 的推送群或用户
+                                        # GOBOT_URL 设置 /send_private_msg 时填入 user_id=个人QQ
+                                        #               /send_group_msg   时填入 group_id=QQ群
+    'GOBOT_TOKEN': '',                  # go-cqhttp 的 access_token
 
-    'IGOT_PUSH_KEY': '',  # iGot 聚合推送的 IGOT_PUSH_KEY
+    'IGOT_PUSH_KEY': '',                # iGot 聚合推送的 IGOT_PUSH_KEY
 
-    'PUSH_KEY': '',  # server 酱的 PUSH_KEY，兼容旧版与 Turbo 版
+    'PUSH_KEY': '',                     # server 酱的 PUSH_KEY，兼容旧版与 Turbo 版
 
-    'PUSH_PLUS_TOKEN': '',  # push+ 微信推送的用户令牌
-    'PUSH_PLUS_USER': '',  # push+ 微信推送的群组编码
+    'PUSH_PLUS_TOKEN': '',              # push+ 微信推送的用户令牌
+    'PUSH_PLUS_USER': '',               # push+ 微信推送的群组编码
 
-    'QMSG_KEY': '',  # qmsg 酱的 QMSG_KEY
-    'QMSG_TYPE': '',  # qmsg 酱的 QMSG_TYPE
+    'QMSG_KEY': '',                     # qmsg 酱的 QMSG_KEY
+    'QMSG_TYPE': '',                    # qmsg 酱的 QMSG_TYPE
 
-    'QYWX_AM': '',  # 企业微信应用
+    'QYWX_AM': '',                      # 企业微信应用
 
-    'QYWX_KEY': '',  # 企业微信机器人
+    'QYWX_KEY': '',                     # 企业微信机器人
 
-    'TG_BOT_TOKEN': '',  # tg 机器人的 TG_BOT_TOKEN，例：1407203283:AAG9rt-6RDaaX0HBLZQq0laNOh898iFYaRQ
-    'TG_USER_ID': '',  # tg 机器人的 TG_USER_ID，例：1434078534
-    'TG_API_HOST': '',  # tg 代理 api
-    'TG_PROXY_AUTH': '',  # tg 代理认证参数
-    'TG_PROXY_HOST': '',  # tg 机器人的 TG_PROXY_HOST
-    'TG_PROXY_PORT': '',  # tg 机器人的 TG_PROXY_PORT
+    'TG_BOT_TOKEN': '',                 # tg 机器人的 TG_BOT_TOKEN，例：1407203283:AAG9rt-6RDaaX0HBLZQq0laNOh898iFYaRQ
+    'TG_USER_ID': '',                   # tg 机器人的 TG_USER_ID，例：1434078534
+    'TG_API_HOST': '',                  # tg 代理 api
+    'TG_PROXY_AUTH': '',                # tg 代理认证参数
+    'TG_PROXY_HOST': '',                # tg 机器人的 TG_PROXY_HOST
+    'TG_PROXY_PORT': '',                # tg 机器人的 TG_PROXY_PORT
     'MI_PUSH_ALIAS': '',
 }
 notify_function = []
@@ -83,21 +95,20 @@ for k in push_config:
     if v := os.getenv(k):
         push_config[k] = v
 
-
 # 读取配置文件中的变量 (会覆盖环境变量)
-# CONFIG_PATH = os.getenv("NOTIFY_CONFIG_PATH")
-# if os.path.exists(CONFIG_PATH):
-#     print(f"通知配置文件存在：{CONFIG_PATH}。")
-#     try:
-#         for k, v in dict(tomli.load(open(CONFIG_PATH, "rb"))).items():
-#             if k in push_config:
-#                 push_config[k] = v
-#     except tomli.TOMLDecodeError:
-#         print(
-#             f"错误：配置文件 {CONFIG_PATH} 格式不对，请学习 https://toml.io/cn/v1.0.0\n错误信息：\n{traceback.format_exc()}"
-#         )
-# elif CONFIG_PATH:
-#     print(f"{CONFIG_PATH} 配置的通知文件不存在，请检查文件位置或删除对应环境变量！")
+CONFIG_PATH = os.getenv("NOTIFY_CONFIG_PATH") # or get_file_path("notify.toml")
+if CONFIG_PATH and os.path.exists(CONFIG_PATH):
+    print(f"通知配置文件存在：{CONFIG_PATH}。")
+    try:
+        for k, v in dict(tomli.load(open(CONFIG_PATH, "rb"))).items():
+            if k in push_config:
+                push_config[k] = v
+    except tomli.TOMLDecodeError:
+        print(
+            f"错误：配置文件 {CONFIG_PATH} 格式不对，请学习 https://toml.io/cn/v1.0.0\n错误信息：\n{traceback.format_exc()}"
+        )
+elif CONFIG_PATH:
+    print(f"{CONFIG_PATH} 配置的通知文件不存在，请检查文件位置或删除对应环境变量！")
 
 
 def bark(title: str, content: str) -> None:
@@ -156,8 +167,9 @@ def dingding_bot(title: str, content: str) -> None:
         return
     print("钉钉机器人 服务启动")
 
-    timestamp = str(round(time.time() * 1000))
+    url = f'https://oapi.dingtalk.com/robot/send?access_token={push_config.get("DD_BOT_TOKEN")}'
     if "DD_BOT_SECRET" in push_config:
+        timestamp = str(round(time.time() * 1000))
         secret_enc = push_config.get("DD_BOT_SECRET").encode("utf-8")
         string_to_sign = "{}\n{}".format(timestamp, push_config.get("DD_BOT_SECRET"))
         string_to_sign_enc = string_to_sign.encode("utf-8")
@@ -165,11 +177,10 @@ def dingding_bot(title: str, content: str) -> None:
             secret_enc, string_to_sign_enc, digestmod=hashlib.sha256
         ).digest()
         sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
-        url = f'https://oapi.dingtalk.com/robot/send?access_token={push_config.get("DD_BOT_TOKEN")}&timestamp={timestamp}&sign={sign}'
-    else:
-        url = f'https://oapi.dingtalk.com/robot/send?access_token={push_config.get("DD_BOT_TOKEN")}&timestamp={timestamp}'
+        url += f'&timestamp={timestamp}&sign={sign}'
+
     headers = {"Content-Type": "application/json;charset=utf-8"}
-    data = {"msgtype": "text", "text": {"content": f"{title}\n\n{content}"}}
+    data = {"msgtype": "markdown", "markdown": {"text": f'#### {title}\n\n{html2md(content)}', "title": title}}
 
     datas = requests.post(
         url=url, data=json.dumps(data), headers=headers, timeout=15
@@ -463,14 +474,13 @@ def telegram_bot(title: str, content: str) -> None:
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     payload = {
         "chat_id": str(push_config.get("TG_USER_ID")),
-        "text": f"{title}\n\n{content}",
+        "text": f"<b><u>{title}</u></b>\n\n{content}",
         "disable_web_page_preview": "true",
+        "parse_mode": "HTML",
     }
     proxies = None
     if push_config.get("TG_PROXY_HOST") and push_config.get("TG_PROXY_PORT"):
-        if push_config.get("TG_PROXY_AUTH") is not None and "@" not in push_config.get(
-                "TG_PROXY_HOST"
-        ):
+        if push_config.get("TG_PROXY_AUTH") is not None and "@" not in push_config.get("TG_PROXY_HOST"):
             push_config["TG_PROXY_HOST"] = (
                     push_config.get("TG_PROXY_AUTH")
                     + "@"
@@ -560,8 +570,7 @@ def send(title: str, content: str) -> None:
 
     hitokoto = push_config.get("HITOKOTO")
 
-    text = one() if hitokoto else ""
-    content += text
+    content += "\n\n> " + one() if hitokoto else ""
 
     ts = [
         threading.Thread(target=mode, args=(title, content), name=mode.__name__)

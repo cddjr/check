@@ -6,6 +6,7 @@ new Env('网易新闻');
 import requests
 
 from utils import check
+from urllib3 import disable_warnings
 
 
 class WYXW:
@@ -65,5 +66,6 @@ def main(*args, **kwargs):
 
 
 if __name__ == "__main__":
+    disable_warnings()
     main()
 

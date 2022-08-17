@@ -117,6 +117,8 @@ class RRTV:
                 ap = obj["data"]["activePoint"]
                 msg += [{"name": "今日活跃度", "value": ap}]
                 print(f'今日活跃度: {ap}')
+                if ap is None:
+                    return msg
                 availBoxes = []
                 boxes = obj["data"]["box"]
                 for box in boxes:

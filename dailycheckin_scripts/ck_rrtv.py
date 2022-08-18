@@ -3,9 +3,11 @@
 cron: 30 10 8,22 * * *
 new Env('多多视频');
 """
+from random import randint
 from utils import check
 from time import sleep
-from urllib3 import disable_warnings
+from urllib3 import disable_warnings, Retry
+from requests.adapters import HTTPAdapter
 import requests
 
 
@@ -13,7 +15,7 @@ class RRTV:
     name = "多多视频"
 
     clientVersion = "5.19.1"
-    clientType = "ios_zyb" # android | android_Meizu
+    clientType = "ios_zyb"  # android | android_Meizu
     userAgent = "PPVideo/1.12 (iPhone; iOS 15.4.1; Scale/3.00)"
     # activity_userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 App/RRSPApp platform/iPhone AppVersion/1.12"
     api_host = "https://api.rr.tv"
@@ -27,16 +29,21 @@ class RRTV:
     taskcenter_url_openbox = api_host + "/v3plus/taskCenter/openBox"
     taskcenter_url_listbox = api_host + "/v3plus/taskCenter/index"
 
+    vip_url_clock = api_host + "/vip/experience/clock"
+
     """
     API定义     https://img.rr.tv/rrsp/0.1.0/js/main.1641814753479.js
     逻辑处理    https://img.rr.tv/rrsp/0.1.0/js/checkin.1641814753479.js
     """
-    token = ""  # rrtv-开头
 
     def __init__(self, check_item):
         self.check_item = check_item
+        self.session = requests.Session()
+        adapter = HTTPAdapter()
+        adapter.max_retries = Retry(connect=3, read=3)
+        self.session.mount('http', adapter)
 
-    def __postRequest(self, url: str, text):
+    def __postRequest(self, url: str, text: str = None):
         """
         发起一个POST请求
 
@@ -52,11 +59,11 @@ class RRTV:
             "clientType": self.clientType,
             "User-Agent": self.userAgent,
             # "Referer": "https://mobile.rr.tv/",
-            "Content-Length": str(len(text)),
+            "Content-Length": str(len(text)) if text is not None else "0",
             "Connection": "keep-alive",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
         }
-        response: requests.Response = requests.post(
+        response: requests.Response = self.session.post(
             url=url, headers=headers, data=text, verify=False)
         return response.json()
 
@@ -66,7 +73,7 @@ class RRTV:
         """
         rewards = []  # {"code":"x", "name":"apple"}
         try:
-            obj = self.__postRequest(self.activity_url_listreward, "")
+            obj = self.__postRequest(self.activity_url_listreward)
             if obj["code"] == "0000":
                 # isinstance(data, list)
                 print("礼盒中的奖品列表")
@@ -112,7 +119,7 @@ class RRTV:
         """
         msg = []
         try:
-            obj = self.__postRequest(self.taskcenter_url_listbox, "")
+            obj = self.__postRequest(self.taskcenter_url_listbox)
             if obj["code"] == "0000":
                 ap = obj["data"]["activePoint"]
                 msg += [{"name": "今日活跃度", "value": ap}]
@@ -135,7 +142,7 @@ class RRTV:
                          "value": f"{len(availBoxes)}/{len(boxes)}个"}]
                 print(f'可开宝箱: {len(availBoxes)}/{len(boxes)}个')
                 for box in availBoxes:
-                    sleep(6)
+                    self.randomSleep(max=3)
                     msg += self.__openBox(box["id"], box["name"])
             else:
                 msg += [{"name": "开宝箱失败",
@@ -153,7 +160,7 @@ class RRTV:
         msg = []
         rewards = self.__getRewardList()
         try:
-            obj = self.__postRequest(self.activity_url_openBag, "")
+            obj = self.__postRequest(self.activity_url_openBag)
             if obj["code"] == "0000":
                 materialCode = obj["data"]["materialCode"]
                 for reward in rewards:
@@ -174,7 +181,7 @@ class RRTV:
 
     def __getCheckinInfo(self):
         try:
-            obj = self.__postRequest(self.activity_url_getinfo, "")
+            obj = self.__postRequest(self.activity_url_getinfo)
             if obj["code"] == "0000":
                 return obj["data"]
             else:
@@ -217,7 +224,7 @@ class RRTV:
                 # 剧本不满足抽奖条件，但可以用骰子重置剧本
                 msg += [{"name": "当前骰子", "value": f'{data.get("diceCount")}个'}]
                 print(f'当前骰子: {data.get("diceCount")}个')
-                sleep(6)
+                self.randomSleep(max=3)
                 resetSucc = False
                 for card in data.get("cardDetailList", []):
                     if card.get("showDice") == True:
@@ -242,11 +249,32 @@ class RRTV:
 
         return msg, canDraw
 
+    def vipSignIn(self):
+        """
+        VIP打卡
+
+        """
+        msg = []
+        try:
+            obj = self.__postRequest(self.vip_url_clock)
+            if obj["code"] == "0000":
+                msg += [{"name": "每日打卡",
+                         "value": f'成功 当前V力值{obj["data"]["changedValue"]}'}]
+                print(f'打卡成功: 当前V力值:{obj["data"]["changedValue"]}')
+            else:  # 9999 重复打卡
+                msg += [{"name": "打卡失败",
+                         "value": f'code:{obj["code"]}, msg:{obj["msg"]}'}]
+                print(f'打卡失败: code:{obj["code"]}, msg:{obj["msg"]}')
+        except Exception as e:
+            print(f"打卡异常: {e}")
+            msg += [{"name": "打卡异常", "value": f"请检查接口 {e}"}]
+        return msg
+
     def signIn(self):
         """
         签到
 
-        不用担心反复签到 因为客户端每次进签到页面都会调用这个api
+        0点容易失败 避开签到高峰
         """
         msg = []
         try:
@@ -283,21 +311,29 @@ class RRTV:
             msg += [{"name": "签到异常", "value": f"请检查接口 {e}"}]
         return msg
 
+    def randomSleep(self, min=1, max=6):
+        sleep(randint(min, max))
+
     def main(self):
         msg = []
         try:
-            self.token = self.check_item["token"]
+            self.token: str = self.check_item.get("token", "")
+            if not self.token.startswith('rrtv-'):
+                raise ValueError('token配置有误 必须rrtv-开头')
             msg += self.signIn()
             # 无论签到是否成功，我们继续执行，也许能抽奖
             info_msg, canDraw = self.getSignInfo()
             msg += info_msg
             if canDraw == True:
                 # 可以抽奖
-                sleep(6)
+                self.randomSleep()
                 msg += self.giftDraw()
             # 尝试开宝箱
-            sleep(6)
+            self.randomSleep()
             msg += self.openAllBoxes()
+            # 尝试VIP打卡
+            self.randomSleep()
+            msg += self.vipSignIn()
         except Exception as e:
             print(f"失败: 请检查接口{e}")
             msg += [{"name": "失败", "value": f"请检查接口 {e}"}]

@@ -25,7 +25,8 @@ class PUPU:
         self.session = requests.Session()
         adapter = HTTPAdapter()
         adapter.max_retries = Retry(connect=3, read=3)
-        self.session.mount('http', adapter)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
         self.access_token = None
 
     def __sendRequest(self, method: str, url: str, jsonText=None):

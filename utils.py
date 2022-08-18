@@ -180,15 +180,19 @@ class config_get(object):
 
 
 class check(object):
-    def __init__(self, run_script_name, run_script_expression, Configuration_flag=False):
+    def __init__(self, run_script_name, run_script_expression, Configuration_flag=False, interval_min=5, interval_max=10):
         """
         :param run_script_name: 执行脚本的说明
         :param run_script_expression: 需要获取的配置键的re表达式
         :param Configuration_flag: 是否只检测True或False(默认为False)
+        :param interval_min: 多账号执行的最小间隔时间(默认为5秒)
+        :param interval_max: 多账号执行的最大间隔时间(默认为10秒 设置0代表无间隔)
         """
         self.run_script_name = run_script_name
         self.run_script_expression = run_script_expression
         self.Configuration_flag = Configuration_flag
+        self.interval_min = interval_min
+        self.interval_max = interval_max
 
     @staticmethod
     def other_task():
@@ -202,11 +206,11 @@ class check(object):
                 config = config_get()
                 value_list = config.get_value(self.run_script_expression)
                 push_message = ""
-                num = 1
+                num = 0
                 for value in value_list:
+                    num += 1
                     print(f"<----------------账号【{num}】---------------->")
                     print(f"获取到的账号信息为:{value}\n")
-                    num += 1
                     try:
                         result = func(value=value) + '\n\n'
                         print(f"执行结果:\n{result}")
@@ -223,6 +227,17 @@ class check(object):
                     except TypeError:
                         print(f"{traceback.format_exc()}")
                         push_message += ''
+                    except SystemExit:
+                        # 脚本中执行exit不要影响其它账号的运行
+                        push_message += ''
+                    except BaseException:
+                        # 未知异常，打印调用栈，继续执行下一个账号
+                        print(f"{traceback.format_exc()}")
+                        push_message += ''
+                    if self.interval_max > 0 and num < len(value_list):
+                        interval = random.randint(self.interval_min, self.interval_max)
+                        print(f"随机等待{interval}秒执行下一个账号...")
+                        time.sleep(random.randint(self.interval_min, self.interval_max))
                 send(self.run_script_name, push_message)
             else:
                 config = config_get()

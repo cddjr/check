@@ -210,7 +210,10 @@ class check(object):
                 for value in value_list:
                     num += 1
                     print(f"<----------------账号【{num}】---------------->")
-                    print(f"获取到的账号信息为:{value}\n")
+                    username = value.get('username', value.get('name', value.get('email', value.get('phone'))))
+                    if not username:
+                        username = str(value)[:32] + "..."
+                    print(f"获取到的账号信息为:{username}\n")
                     try:
                         result = func(value=value) + '\n\n'
                         print(f"执行结果:\n{result}")

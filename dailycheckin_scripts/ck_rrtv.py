@@ -3,9 +3,7 @@
 cron: 30 10 8,22 * * *
 new Env('多多视频');
 """
-from random import randint
-from utils import check
-from time import sleep
+from utils import check, randomSleep
 from urllib3 import disable_warnings, Retry
 from requests.adapters import HTTPAdapter
 import requests
@@ -144,7 +142,7 @@ class RRTV:
                          "value": f"{len(availBoxes)}/{len(boxes)}个"}]
                 print(f'可开宝箱: {len(availBoxes)}/{len(boxes)}个')
                 for box in availBoxes:
-                    self.randomSleep(max=3)
+                    randomSleep(max=3)
                     msg += self.__openBox(box["id"], box["name"])
             else:
                 msg += [{"name": "开宝箱失败",
@@ -226,7 +224,7 @@ class RRTV:
                 # 剧本不满足抽奖条件，但可以用骰子重置剧本
                 msg += [{"name": "当前骰子", "value": f'{data.get("diceCount")}个'}]
                 print(f'当前骰子: {data.get("diceCount")}个')
-                self.randomSleep(max=3)
+                randomSleep(max=3)
                 resetSucc = False
                 for card in data.get("cardDetailList", []):
                     if card.get("showDice") == True:
@@ -313,9 +311,6 @@ class RRTV:
             msg += [{"name": "签到异常", "value": f"请检查接口 {e}"}]
         return msg
 
-    def randomSleep(self, min=1, max=6):
-        sleep(randint(min, max))
-
     def main(self):
         msg = []
         try:
@@ -328,13 +323,13 @@ class RRTV:
             msg += info_msg
             if canDraw == True:
                 # 可以抽奖
-                self.randomSleep()
+                randomSleep()
                 msg += self.giftDraw()
             # 尝试开宝箱
-            self.randomSleep()
+            randomSleep()
             msg += self.openAllBoxes()
             # 尝试VIP打卡
-            self.randomSleep()
+            randomSleep()
             msg += self.vipSignIn()
         except Exception as e:
             print(f"失败: 请检查接口{e}")

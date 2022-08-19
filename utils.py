@@ -238,9 +238,7 @@ class check(object):
                         print(f"{traceback.format_exc()}")
                         push_message += ''
                     if self.interval_max > 0 and num < len(value_list):
-                        interval = random.randint(self.interval_min, self.interval_max)
-                        print(f"随机等待{interval}秒执行下一个账号...")
-                        time.sleep(random.randint(self.interval_min, self.interval_max))
+                        randomSleep(self.interval_min, self.interval_max)
                 send(self.run_script_name, push_message)
             else:
                 config = config_get()
@@ -302,6 +300,24 @@ def change_cron_old(cron_file_path="/ql/db/crontab.db", repositories="cddjr_chec
 
     with open(cron_file_path, "w", encoding="UTF-8") as f:
         f.writelines(lines)
+
+
+def randomSleep(min=1, max=6):
+    interval = random.randint(min, max)
+    print(f"随机等待{interval}秒...")
+    time.sleep(interval)
+
+
+def log(s: str, msg_list=None):
+    print(s)
+    if msg_list is not None:
+        msg_list += [s]
+
+
+def cookie_to_dic(cookie: str):
+    if not cookie:
+        return {}
+    return {item.split('=')[0]: item.split('=')[1] for item in cookie.split('; ')}
 
 
 if __name__ == "__main__":

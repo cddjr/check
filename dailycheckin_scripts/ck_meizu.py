@@ -2,12 +2,11 @@
 """
 new Env('MEIZU社区');
 """
-import time
 from urllib3 import disable_warnings, Retry
 from requests.adapters import HTTPAdapter
 import requests
 
-from utils import check
+from utils import check, randomSleep
 
 
 class Meizu:
@@ -81,7 +80,7 @@ class Meizu:
                     one_msg = f"抽奖出错: {e}"
                     error_count += 1
                 print(f"第{i + 1}次抽奖结果：" + str(one_msg))
-                time.sleep(5)
+                randomSleep()
             msg = f"成功抽奖 {success_count} 次"
             draw_msg = [
                 {"name": "抽奖信息", "value": str(msg)},

@@ -23,8 +23,9 @@ class PUPU:
     def __init__(self, check_item):
         self.check_item = check_item
         self.session = requests.Session()
+        self.session.verify = False
         adapter = HTTPAdapter()
-        adapter.max_retries = Retry(connect=3, read=3)
+        adapter.max_retries = Retry(connect=3, read=3, allowed_methods=False)
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
         self.access_token = None
@@ -55,7 +56,7 @@ class PUPU:
             else:
                 headers["Content-Length"] = "0"
         response: requests.Response = self.session.request(method,
-                                                           url=url, headers=headers, data=jsonText, verify=False)
+                                                           url=url, headers=headers, data=jsonText)
         return response.json()
 
     def refreshAccessToken(self):
@@ -118,7 +119,7 @@ class PUPU:
             elif obj["errcode"] == 350011:
                 msg += [{"name": "重复签到", "value": f"忽略"}]
                 print("重复签到 直接退出")
-                exit() #目前没必要执行后续的操作
+                exit()  # 目前没必要执行后续的操作
             else:  # 400000 请求参数不合法
                 msg += [{"name": "签到失败",
                          "value": f'code:{obj["errcode"]}, msg:{obj["errmsg"]}'}]

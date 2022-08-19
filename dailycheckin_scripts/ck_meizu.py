@@ -3,7 +3,8 @@
 new Env('MEIZU社区');
 """
 import time
-
+from urllib3 import disable_warnings, Retry
+from requests.adapters import HTTPAdapter
 import requests
 
 from utils import check
@@ -14,9 +15,14 @@ class Meizu:
 
     def __init__(self, check_item):
         self.check_item = check_item
+        self.session = requests.Session()
+        self.session.verify = False
+        adapter = HTTPAdapter()
+        adapter.max_retries = Retry(connect=3, read=3, allowed_methods=False)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
 
-    @staticmethod
-    def sign(cookie):
+    def sign(self, cookie):
         headers = {
             "authority": "bbs-act.meizu.cn",
             "pragma": "no-cache",
@@ -32,12 +38,11 @@ class Meizu:
             ("mod", "signin"),
             ("action", "sign"),
         )
-        response = requests.get(url="https://bbs-act.meizu.cn/index.php", headers=headers, params=params).json()
+        response = self.session.get(url="https://bbs-act.meizu.cn/index.php", headers=headers, params=params).json()
         msg = response.get("message")
         return msg
 
-    @staticmethod
-    def draw(cookie, count: int = 0):
+    def draw(self, cookie, count: int = 0):
         headers = {
             "authority": "bbs-act.meizu.cn",
             "accept": "application/json, text/javascript, */*; q=0.01",
@@ -56,7 +61,7 @@ class Meizu:
         if count:
             for i in range(count):
                 try:
-                    data = requests.post(url="https://bbs-act.meizu.cn/index.php", headers=headers, data=draw_data).json()
+                    data = self.session.post(url="https://bbs-act.meizu.cn/index.php", headers=headers, data=draw_data).json()
                     if data["code"] == 200:
                         one_msg = data.get("data", {}).get("award_name")
                         award_list.append(one_msg)
@@ -87,7 +92,7 @@ class Meizu:
                 {"name": "抽奖信息", "value": "未开启抽奖"},
             ]
         data = {"mod": "index", "action": "get_user_count", "id": "2"}
-        user_info = requests.post("https://bbs-act.meizu.cn/index.php", headers=headers, data=data).json()
+        user_info = self.session.post("https://bbs-act.meizu.cn/index.php", headers=headers, data=data).json()
         uid = user_info.get("data", {}).get("uid")
         return draw_msg, uid
 
@@ -114,4 +119,5 @@ def main(*args, **kwargs):
 
 
 if __name__ == "__main__":
+    disable_warnings()
     main()

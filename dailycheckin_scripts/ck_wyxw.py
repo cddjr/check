@@ -15,8 +15,9 @@ class WYXW:
     def __init__(self, check_item):
         self.check_item = check_item
         self.session = requests.Session()
+        self.session.verify = False
         adapter = HTTPAdapter()
-        adapter.max_retries = Retry(connect=3, read=3)
+        adapter.max_retries = Retry(connect=3, read=3, allowed_methods=False)
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
@@ -29,7 +30,7 @@ class WYXW:
             "User-U": self.user_u
         }
         response = self.session.post(url="https://c.m.163.com/uc/api/sign/v3/commit",
-                                     headers=headers, data=self.data, verify=False).json()
+                                     headers=headers, data=self.data).json()
         try:
             if response["code"] == 200:
                 data = response["data"]

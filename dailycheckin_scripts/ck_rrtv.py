@@ -39,8 +39,9 @@ class RRTV:
     def __init__(self, check_item):
         self.check_item = check_item
         self.session = requests.Session()
+        self.session.verify = False
         adapter = HTTPAdapter()
-        adapter.max_retries = Retry(connect=3, read=3)
+        adapter.max_retries = Retry(connect=3, read=3, allowed_methods=False)
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
@@ -65,7 +66,7 @@ class RRTV:
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
         }
         response: requests.Response = self.session.post(
-            url=url, headers=headers, data=text, verify=False)
+            url=url, headers=headers, data=text)
         return response.json()
 
     def __getRewardList(self):

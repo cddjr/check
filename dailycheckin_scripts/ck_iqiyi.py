@@ -10,7 +10,8 @@ import re
 import string
 import time
 from urllib.parse import unquote
-
+from urllib3 import disable_warnings, Retry
+from requests.adapters import HTTPAdapter
 import requests
 
 from utils import check
@@ -21,6 +22,12 @@ class IQIYI:
 
     def __init__(self, check_item):
         self.check_item = check_item
+        self.session = requests.Session()
+        self.session.verify = False
+        adapter = HTTPAdapter()
+        adapter.max_retries = Retry(connect=3, read=3, allowed_methods=False)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
 
     @staticmethod
     def parse_cookie(cookie):
@@ -43,15 +50,14 @@ class IQIYI:
             return self.md5(c.join(buf))
         return c.join(buf)
 
-    @staticmethod
-    def user_information(p00001):
+    def user_information(self, p00001):
         """
         账号信息查询
         """
         time.sleep(3)
         url = "http://serv.vip.iqiyi.com/vipgrowth/query.action"
         params = {"P00001": p00001}
-        res = requests.get(url=url, params=params).json()
+        res = self.session.get(url=url, params=params).json()
         if res["code"] == "A00000":
             try:
                 res_data = res.get("data", {})
@@ -78,14 +84,13 @@ class IQIYI:
             ]
         return msg
 
-    @staticmethod
-    def sign(p00001):
+    def sign(self, p00001):
         """
         VIP 签到
         """
         url = "https://tc.vip.iqiyi.com/taskCenter/task/queryUserTask"
         params = {"P00001": p00001, "autoSign": "yes"}
-        res = requests.get(url=url, params=params).json()
+        res = self.session.get(url=url, params=params).json()
         if res["code"] == "A00000":
             try:
                 cumulate_sign_days_sum = res["data"]["monthlyGrowthReward"]
@@ -124,7 +129,7 @@ class IQIYI:
         sign = self.get_sign("|", sign_date, "UKobMjDMsDoScuWOfp6F")
         url = f"https://community.iqiyi.com/openApi/task/execute?{self.get_sign('&', sign_date)}&sign={sign}"
         header = {"Content-Type": "application/json"}
-        res = requests.post(url, headers=header, data=json.dumps(post_date)).json()
+        res = self.session.post(url, headers=header, data=json.dumps(post_date)).json()
         if res["code"] == "A00000":
             if res["data"]["code"] == "A0000":
                 # quantity = res["data"]["data"]["rewards"][0]["rewardCount"]  # 积分
@@ -157,7 +162,7 @@ class IQIYI:
 
         sign = self.get_sign("|", web_sign_date, "DO58SzN6ip9nbJ4QkM8H")
         url = f"https://community.iqiyi.com/openApi/score/add?{self.get_sign('&', web_sign_date)}&sign={sign}"
-        res = requests.get(url).json()
+        res = self.session.get(url).json()
         if res["code"] == "A00000":
             if res["data"][0]["code"] == "A0000":
                 quantity = res["data"][0]["score"]
@@ -170,15 +175,14 @@ class IQIYI:
             msg = [{"name": "WEB 签到", "value": f"网页端签到失败:{res['message']}"}]
         return msg
 
-    @staticmethod
-    def query_user_task(p00001):
+    def query_user_task(self, p00001):
         """
         获取 VIP 日常任务 和 taskCode(任务状态)
         """
         url = "https://tc.vip.iqiyi.com/taskCenter/task/queryUserTask"
         params = {"P00001": p00001}
         task_list = []
-        res = requests.get(url=url, params=params).json()
+        res = self.session.get(url=url, params=params).json()
         if res["code"] == "A00000":
             for item in res["data"]["tasks"]["daily"]:
                 task_list.append(
@@ -191,8 +195,7 @@ class IQIYI:
                 )
         return task_list
 
-    @staticmethod
-    def join_task(p00001, task_list):
+    def join_task(self, p00001, task_list):
         """
         遍历完成任务
         """
@@ -201,10 +204,9 @@ class IQIYI:
         for item in task_list:
             if item["status"] == 2:
                 params["taskCode"] = item["taskCode"]
-                requests.get(url=url, params=params)
+                self.session.get(url=url, params=params)
 
-    @staticmethod
-    def get_task_rewards(p00001, task_list):
+    def get_task_rewards(self, p00001, task_list):
         """
         获取任务奖励
         :return: 返回信息
@@ -215,18 +217,17 @@ class IQIYI:
         for item in task_list:
             if item["status"] == 0:
                 params["taskCode"] = item.get("taskCode")
-                requests.get(url=url, params=params)
+                self.session.get(url=url, params=params)
             elif item["status"] == 4:
-                requests.get(url="https://tc.vip.iqiyi.com/taskCenter/task/notify", params=params)
+                self.session.get(url="https://tc.vip.iqiyi.com/taskCenter/task/notify", params=params)
                 params["taskCode"] = item.get("taskCode")
-                requests.get(url=url, params=params)
+                self.session.get(url=url, params=params)
             elif item["status"] == 1:
                 growth_task += item["taskReward"]
         msg = {"name": "任务奖励", "value": f"+{growth_task}成长值"}
         return msg
 
-    @staticmethod
-    def draw(draw_type, p00001, p00003):
+    def draw(self, draw_type, p00001, p00003):
         """
         查询抽奖次数(必),抽奖
         :param draw_type: 类型。0 查询次数；1 抽奖
@@ -253,7 +254,7 @@ class IQIYI:
         }
         if draw_type == 1:
             del params["lottery_chance"]
-        res = requests.get(url=url, params=params).json()
+        res = self.session.get(url=url, params=params).json()
         if not res.get("code"):
             chance = int(res.get("daysurpluschance"))
             msg = res.get("awardName")
@@ -320,4 +321,5 @@ def main(*args, **kwargs):
 
 
 if __name__ == "__main__":
+    disable_warnings()
     main()

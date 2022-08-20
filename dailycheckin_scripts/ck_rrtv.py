@@ -3,15 +3,13 @@
 cron: 30 10 8,22 * * *
 new Env('多多视频');
 """
-from utils import check, randomSleep
+from utils import check, randomSleep, log
 from urllib3 import disable_warnings, Retry
 from requests.adapters import HTTPAdapter
 import requests
 
 
 class RRTV:
-    name = "多多视频"
-
     clientVersion = "5.19.1"
     clientType = "ios_zyb"  # android | android_Meizu
     userAgent = "PPVideo/1.12 (iPhone; iOS 15.4.1; Scale/3.00)"
@@ -43,7 +41,7 @@ class RRTV:
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
-    def __postRequest(self, url: str, text: str = None):
+    def __postRequest(self, url: str, data=None, json=None):
         """
         发起一个POST请求
 
@@ -59,12 +57,10 @@ class RRTV:
             "clientType": self.clientType,
             "User-Agent": self.userAgent,
             # "Referer": "https://mobile.rr.tv/",
-            "Content-Length": str(len(text)) if text is not None else "0",
-            "Connection": "keep-alive",
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+            "Connection": "keep-alive"
         }
         response: requests.Response = self.session.post(
-            url=url, headers=headers, data=text)
+            url=url, headers=headers, data=data, json=json)
         return response.json()
 
     def __getRewardList(self):
@@ -76,16 +72,16 @@ class RRTV:
             obj = self.__postRequest(self.activity_url_listreward)
             if obj["code"] == "0000":
                 # isinstance(data, list)
-                print("礼盒中的奖品列表")
+                log("礼盒中的奖品列表")
                 for reward in obj.get("data", []):
                     code = reward.get("code", "unknown")
                     name = f'{reward.get("text1")}{reward.get("text2")}'
                     rewards += [{"code": code, "name": name}]
-                    print(f"\t{name}")
+                    log(f'- {name}')
             else:
-                print(f'获取奖品列表失败: code:{obj["code"]}, msg:{obj["msg"]}')
+                log(f'获取奖品列表失败: code:{obj["code"]}, msg:{obj["msg"]}')
         except Exception as e:
-            print(f"获取奖品列表异常: {e}")
+            log(f'获取奖品列表异常: {e}')
         return rewards
 
     def __openBox(self, id: str, name: str):
@@ -98,19 +94,15 @@ class RRTV:
         msg = []
         try:
             obj = self.__postRequest(
-                self.taskcenter_url_openbox, f"boxId={id}")
+                self.taskcenter_url_openbox, data={"boxId": id})
             if obj["code"] == "0000":
                 box = obj["data"]["boxs"][0]
                 reward = f'{box.get("rewardName")}+{box.get("rewardNum")}'
-                msg += [{"name": f"\t开{name}", "value": reward}]
-                print(f'\t开{name}: {reward}')
+                log(f'- 开{name}: {reward}', msg)
             else:
-                msg += [{"name": f"\t开{name}失败",
-                         "value": f'code:{obj["code"]}, msg:{obj["msg"]}'}]
-                print(f'\t开{name}失败: code:{obj["code"]}, msg:{obj["msg"]}')
+                log(f'- 开{name}失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
-            print(f"\t开{name}异常: {e}")
-            msg += [{"name": f"\t开{name}异常", "value": f"请检查接口 {e}"}]
+            log(f'- 开{name}异常: 请检查接口 {e}', msg)
         return msg
 
     def openAllBoxes(self):
@@ -122,8 +114,7 @@ class RRTV:
             obj = self.__postRequest(self.taskcenter_url_listbox)
             if obj["code"] == "0000":
                 ap = obj["data"]["activePoint"]
-                msg += [{"name": "今日活跃度", "value": ap}]
-                print(f'今日活跃度: {ap}')
+                log(f'今日活跃度: {ap}', msg)
                 if ap is None:
                     return msg
                 availBoxes = []
@@ -132,25 +123,20 @@ class RRTV:
                     id = str(box["id"])
                     name = box.get("name", id)
                     if not box.get("enabled", 0) == 1:
-                        print(f"\t{name} 没有启用")
+                        log(f'- {name} 没有启用')
                         continue
                     if not box.get("status", 1) == 0:
-                        print(f"\t{name} 已开过 忽略")
+                        log(f'- {name} 已开过 忽略')
                         continue
                     availBoxes += [{"id": id, "name": name}]
-                msg += [{"name": "可开宝箱",
-                         "value": f"{len(availBoxes)}/{len(boxes)}个"}]
-                print(f'可开宝箱: {len(availBoxes)}/{len(boxes)}个')
+                log(f'可开宝箱: {len(availBoxes)}/{len(boxes)}个', msg)
                 for box in availBoxes:
                     randomSleep(max=3)
                     msg += self.__openBox(box["id"], box["name"])
             else:
-                msg += [{"name": "开宝箱失败",
-                         "value": f'code:{obj["code"]}, msg:{obj["msg"]}'}]
-                print(f'开宝箱失败: code:{obj["code"]}, msg:{obj["msg"]}')
+                log(f'开宝箱失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
-            print(f"获取宝箱异常: {e}")
-            msg += [{"name": "获取宝箱异常", "value": f"请检查接口 {e}"}]
+            log(f'获取宝箱异常: 请检查接口 {e}', msg)
         return msg
 
     def giftDraw(self):
@@ -166,17 +152,12 @@ class RRTV:
                 for reward in rewards:
                     if reward["code"] == materialCode:
                         # 中奖
-                        msg += [{"name": "\t礼盒抽中",
-                                 "value": f'{reward["name"]} 请到App中查收'}]
-                        print(f'\t礼盒抽中: {reward["name"]} 请到App中查收')
+                        log(f'- 礼盒抽中: {reward["name"]} 请到App中查收', msg)
                         break
             else:
-                msg += [{"name": "\t抽奖失败",
-                         "value": f'code:{obj["code"]}, msg:{obj["msg"]}'}]
-                print(f'\t抽奖失败: code:{obj["code"]}, msg:{obj["msg"]}')
+                log(f'- 抽奖失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
-            print(f"\t抽奖异常: {e}")
-            msg += [{"name": "\t抽奖异常", "value": f"请检查接口 {e}"}]
+            log(f'- 抽奖异常: 请检查接口 {e}', msg)
         return msg
 
     def __getCheckinInfo(self):
@@ -185,26 +166,27 @@ class RRTV:
             if obj["code"] == "0000":
                 return obj["data"]
             else:
-                print(f'获取签到失败: code:{obj["code"]}, msg:{obj["msg"]}')
+                log(f'获取签到信息失败: code:{obj["code"]}, msg:{obj["msg"]}')
         except Exception as e:
-            print(f"获取签到异常: {e}")
+            log(f'获取签到信息异常: {e}')
         return {}
 
     def __resetCard(self, id):
         """
         重置剧本
         """
+        msg = []
         try:
             obj = self.__postRequest(
-                self.activity_url_reflashCard, f"cardDetailId={id}")
+                self.activity_url_reflashCard, data={"cardDetailId": id})
             if obj["code"] == "0000":
-                print(f'重置剧本{id}成功')
-                return True
+                log(f'- 重置剧本{id}成功', msg)
+                return True, msg
             else:
-                print(f'重置剧本{id}失败: code:{obj["code"]}, msg:{obj["msg"]}')
+                log(f'- 重置剧本{id}失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
-            print(f"重置剧本{id}异常: {e}")
-        return False
+            log(f'- 重置剧本{id}异常: {e}', msg)
+        return False, msg
 
     def getSignInfo(self):
         """
@@ -219,33 +201,29 @@ class RRTV:
             signDetailList = data.get("signDetailList", [])
             if len(signDetailList) > 0:
                 continueDays = str(signDetailList[0].get("continueDays", "-1"))
-                msg += [{"name": "已连续签到", "value": f"{continueDays}天"}]
+                log(f'已连续签到: {continueDays}天', msg)
+            log(f'当前骰子: {data.get("diceCount")}个', msg)
             while data.get("canOpenBag") == False and int(data.get("diceCount", 0)) > 0:
                 # 剧本不满足抽奖条件，但可以用骰子重置剧本
-                msg += [{"name": "当前骰子", "value": f'{data.get("diceCount")}个'}]
-                print(f'当前骰子: {data.get("diceCount")}个')
                 randomSleep(max=3)
                 resetSucc = False
                 for card in data.get("cardDetailList", []):
                     if card.get("showDice") == True:
                         # 这个剧本可以用骰子换一个
-                        resetSucc = self.__resetCard(card["id"])
+                        resetSucc, resetMsg = self.__resetCard(card["id"])
+                        msg += resetMsg
                         break
-                msg += [{"name": "重置剧本", "value": "成功" if resetSucc else "失败"}]
-                if resetSucc:
-                    # 如果重置成功 则再循环一次判断
-                    data = self.__getCheckinInfo()
-                else:
-                    # 重置失败 放弃
+                if not resetSucc:
                     break
+                # 重置成功 则再循环一次判断
+                data = self.__getCheckinInfo()
+                log(f'- 剩余骰子: {data.get("diceCount")}个', msg)
             if data.get("canOpenBag") == True and data.get("isOpenBag") == False:
                 # 本周没有抽过，可以抽奖
                 canDraw = True
-            msg += [{"name": "是否可抽奖", "value": "是" if canDraw else "否"}]
-            print(f'是否可抽奖: {"是" if canDraw else "否"}')
+            log(f'是否可抽奖: {"是" if canDraw else "否"}', msg)
         except Exception as e:
-            print(f"获取签到异常: {e}")
-            msg += [{"name": "获取签到异常", "value": f"请检查接口 {e}"}]
+            log(f'解析签到异常: 请检查接口 {e}', msg)
 
         return msg, canDraw
 
@@ -258,16 +236,13 @@ class RRTV:
         try:
             obj = self.__postRequest(self.vip_url_clock)
             if obj["code"] == "0000":
-                msg += [{"name": "每日打卡",
-                         "value": f'成功 当前V力值{obj["data"]["changedValue"]}'}]
-                print(f'打卡成功: 当前V力值:{obj["data"]["changedValue"]}')
-            else:  # 9999 重复打卡
-                msg += [{"name": "打卡失败",
-                         "value": f'code:{obj["code"]}, msg:{obj["msg"]}'}]
-                print(f'打卡失败: code:{obj["code"]}, msg:{obj["msg"]}')
+                log(f'打卡成功: 当前V力值{obj["data"]["changedValue"]}', msg)
+            elif obj["code"] == "9999":
+                log('重复打卡: 忽略', msg)
+            else:
+                log(f'打卡失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
-            print(f"打卡异常: {e}")
-            msg += [{"name": "打卡异常", "value": f"请检查接口 {e}"}]
+            log(f'打卡异常: 请检查接口 {e}', msg)
         return msg
 
     def signIn(self):
@@ -278,37 +253,30 @@ class RRTV:
         """
         msg = []
         try:
-            obj = self.__postRequest(self.activity_url_sign, "dayOffset=0")
+            obj = self.__postRequest(self.activity_url_sign, {"dayOffset": 0})
             if obj["code"] == "0000":  # 8650应该是补签成功的返回码 8751是补签条件不满足
-                msg += [{"name": "每日签到", "value": f"成功"}]
-                print("签到成功")
+                log(f'每日签到: 成功', msg)
                 data = obj["data"]
                 # 剧本
                 for card in data.get("cardList", []):
-                    msg += [{"name": "获得剧本",
-                             "value": f'{card.get("type")} {card.get("name")} '}]
+                    log(f'获得剧本: {card.get("type")} {card.get("name")}', msg)
                 # 经验值
                 for jyz in data.get("jyzList", []):
-                    msg += [{"name": "签到奖励", "value": f"经验值+{jyz}"}]
+                    log(f'签到奖励: 经验值+{jyz}', msg)
                 # 每周连续签到第3、6天将分别获得一个骰子
-                # 应该和jyzList一样是数值
                 for dice in data.get("diceList", []):
-                    msg += [{"name": "签到奖励", "value": f"骰子+{dice}"}]
+                    log(f'签到奖励: 骰子+{dice}', msg)
                 # 这是签到获得的勋章
                 for medal in data.get("medalList", []):
-                    print(str(medal))
+                    log(str(medal))
                     # 至少目前客户端是这样写死只有小蜜蜂
-                    msg += [{"name": "签到奖励", "value": "勋章 小蜜蜂7天"}]
+                    log('签到奖励: 勋章 小蜜蜂7天', msg)
             elif obj["code"] == "8750":
-                msg += [{"name": "重复签到", "value": f"忽略"}]
-                print("重复签到")
+                log('重复签到: 忽略', msg)
             else:
-                msg += [{"name": "签到失败",
-                         "value": f'code:{obj["code"]}, msg:{obj["msg"]}'}]
-                print(f'签到失败: code:{obj["code"]}, msg:{obj["msg"]}')
+                log(f'签到失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
-            print(f"签到异常: {e}")
-            msg += [{"name": "签到异常", "value": f"请检查接口 {e}"}]
+            log(f'签到异常: 请检查接口 {e}', msg)
         return msg
 
     def main(self):
@@ -332,10 +300,8 @@ class RRTV:
             randomSleep()
             msg += self.vipSignIn()
         except Exception as e:
-            print(f"失败: 请检查接口{e}")
-            msg += [{"name": "失败", "value": f"请检查接口 {e}"}]
-        msg = "\n".join(
-            [f"{one.get('name')}: {one.get('value')}" for one in msg])
+            log(f'失败: 请检查接口{e}', msg)
+        msg = "\n".join(msg)
         return msg
 
 

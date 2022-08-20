@@ -3,15 +3,13 @@
 cron: 0 1,20 * * *
 new Env('朴朴');
 """
-from utils import check
+from utils import check, log
 from urllib3 import disable_warnings, Retry
 from requests.adapters import HTTPAdapter
 import requests
 
 
 class PUPU:
-    name = "朴朴"
-
     userAgent = "Pupumall/3.0.8;iOS 15.4.1"
     api_host = "https://j1.pupuapi.com"
 
@@ -30,7 +28,7 @@ class PUPU:
         self.session.mount("http://", adapter)
         self.access_token = None
 
-    def __sendRequest(self, method: str, url: str, jsonText=None):
+    def __sendRequest(self, method: str, url: str, data=None, json=None):
         """
         发起一个POST/GET/PUT请求
 
@@ -42,21 +40,13 @@ class PUPU:
             "Accept-Language": "zh-CN,zh-Hans;q=0.9",
             "User-Agent": self.userAgent,
             # "Referer": "https://ma.pupumall.com/",
-            "Content-Length": str(len(jsonText)) if jsonText is not None else "0",
-            "Connection": "keep-alive",
-            "Content-Type": "application/json"
+            "Connection": "keep-alive"
         }
         method = method.upper()
         if self.access_token is not None:
             headers["Authorization"] = f'Bearer {self.access_token}'
-        if method == 'POST' or method == 'PUT':
-            if jsonText is not None:
-                headers["Content-Length"] = str(len(jsonText))
-                headers["Content-Type"] = "application/json"
-            else:
-                headers["Content-Length"] = "0"
         response: requests.Response = self.session.request(method,
-                                                           url=url, headers=headers, data=jsonText)
+                                                           url=url, headers=headers, data=data, json=json)
         return response.json()
 
     def refreshAccessToken(self):
@@ -85,21 +75,17 @@ class PUPU:
         msg = []
         try:
             self.access_token = None
-            obj = self.__sendRequest(
-                "put", self.url_get_token, f'{{"refresh_token":"{self.token}"}}')
+            obj = self.__sendRequest("put", self.url_get_token,
+                                     json={"refresh_token": self.token})
             if obj["errcode"] == 0:
                 data = obj["data"]
                 nickname = data.get('nick_name', '未知')
                 self.access_token = data.get('access_token', None)
-                msg += [{"name": "账号", "value": nickname}]
-                print(f'账号: {nickname}')
+                log(f'账号: {nickname}', msg)
             else:
-                msg += [{"name": "刷新令牌失败",
-                         "value": f'code:{obj["errcode"]}, msg:{obj["errmsg"]}'}]
-                print(f'刷新令牌失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
+                log(f'刷新令牌失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:
-            print(f"刷新令牌异常: {e}")
-            msg += [{"name": "刷新令牌异常", "value": f"请检查接口 {e}"}]
+            log(f'刷新令牌异常: 请检查接口 {e}', msg)
         return msg
 
     def signIn(self):
@@ -110,23 +96,16 @@ class PUPU:
         try:
             obj = self.__sendRequest("post", self.url_sign)
             if obj["errcode"] == 0:
-                msg += [{"name": "每日签到", "value": f"成功"}]
-                print("签到成功")
                 data = obj["data"]
                 # 积分
-                msg += [{"name": "签到奖励",
-                         "value": f'积分+{data["daily_sign_coin"]} {data["reward_explanation"]}'}]
+                log(f'签到成功: 奖励积分+{data["daily_sign_coin"]} {data["reward_explanation"]}', msg)
             elif obj["errcode"] == 350011:
-                msg += [{"name": "重复签到", "value": f"忽略"}]
-                print("重复签到 直接退出")
+                log("重复签到: 忽略", msg)
                 exit()  # 目前没必要执行后续的操作
             else:  # 400000 请求参数不合法
-                msg += [{"name": "签到失败",
-                         "value": f'code:{obj["errcode"]}, msg:{obj["errmsg"]}'}]
-                print(f'签到失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
+                log(f'签到失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:
-            print(f"签到异常: {e}")
-            msg += [{"name": "签到异常", "value": f"请检查接口 {e}"}]
+            log(f'签到异常: 请检查接口 {e}', msg)
         return msg
 
     def getPeriod(self):
@@ -138,16 +117,11 @@ class PUPU:
             obj = self.__sendRequest("get", self.url_period_info)
             if obj["errcode"] == 0:
                 data = obj["data"]
-                msg += [{"name": "连续签到", "value": f'{data["signed_days"]}天'}]
-                print(f'连续签到{data["signed_days"]}天')
-            else:  # 350011 重复签到  400000 请求参数不合法
-                msg += [{"name": "getPeriod失败",
-                         "value": f'code:{obj["errcode"]}, msg:{obj["errmsg"]}'}]
-                print(
-                    f'getPeriod失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
+                log(f'连续签到: {data["signed_days"]}天', msg)
+            else:
+                log(f'getPeriod失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:
-            print(f"getPeriod异常: {e}")
-            msg += [{"name": "getPeriod异常", "value": f"请检查接口 {e}"}]
+            log(f'getPeriod异常: 请检查接口 {e}', msg)
         return msg
 
     def main(self):
@@ -157,14 +131,12 @@ class PUPU:
             if len(self.token) < 4:
                 raise ValueError("token配置有误")
             msg += self.refreshAccessToken()
-            if self.access_token is not None:
+            if self.access_token:
                 msg += self.signIn()
                 msg += self.getPeriod()
         except Exception as e:
-            print(f"失败: 请检查接口{e}")
-            msg += [{"name": "失败", "value": f"请检查接口 {e}"}]
-        msg = "\n".join(
-            [f"{one.get('name')}: {one.get('value')}" for one in msg])
+            log(f'失败: 请检查接口 {e}', msg)
+        msg = "\n".join(msg)
         return msg
 
 

@@ -21,8 +21,6 @@ import requests
 
 
 class XQZ:
-    name = "闲趣赚3.24"
-
     userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 LT-APP/43/242(YM-RT)"
 
     def __init__(self, check_item):
@@ -81,9 +79,9 @@ class XQZ:
             log(f"获取任务列表异常 请检查接口 {e}", msg)
         return browse_list, msg
 
-    def doTask(self, item):
+    def browseTask(self, item):
         """
-        执行任务 如果失败将抛出StopIteration异常
+        浏览任务 如果失败将抛出StopIteration异常
         """
         msg = []
         try:
@@ -92,13 +90,13 @@ class XQZ:
             obj = self.__sendRequest("post", "https://wap.quxianzhuan.com/reward/browse/append/",
                                      data={"reward_id": id, "formhash": self.formhash, "inajax": 1}).json()
             if obj["state"] != 1:
-                log(f'任务失败 {obj.get("msg", "未知错误")}', msg)
+                log(f'浏览失败 {obj.get("msg", "未知错误")}', msg)
                 raise StopIteration
             log(f'  {obj.get("msg", "已完成")}')
         except StopIteration as e:
             raise e
         except Exception as e:
-            log(f"任务异常 请检查接口 {e}", msg)
+            log(f"浏览异常 请检查接口 {e}", msg)
         return msg
 
     def userInfo(self):
@@ -121,7 +119,7 @@ class XQZ:
             token = cookie_to_dic(cookies).get("tzb_user_cryptograph")
             if not token:
                 raise ValueError("Cookie配置有误 必须有 tzb_user_cryptograph")
-            # Cookie只需要 tzb_user_cryptograph 即可，只有它是7天有效期
+            # Cookie只需要 tzb_user_cryptograph 即可，只有它是5天有效期
             self.session.cookies.set(
                 "tzb_user_cryptograph", token, domain=".quxianzhuan.com")
             curr_page = 1
@@ -136,7 +134,7 @@ class XQZ:
                 total_task += len(task_list)
                 try:
                     for task in task_list:
-                        self.doTask(task)
+                        self.browseTask(task)
                         succ_task += 1
                         try:
                             unit_price = float(task.get("unit_price"))
@@ -150,8 +148,11 @@ class XQZ:
                     # 这已经是最后一页
                     break
                 curr_page += 1
-            log(f'已成功完成{succ_task}个任务 获得{price}元', msg)
+            log(f'已成功浏览{succ_task}个任务 获得{price}元', msg)
             msg += self.userInfo()
+            new_token = self.session.cookies.get("tzb_user_cryptograph")
+            if new_token != token:
+                log(f'测试代码居然跑进来了 new_token={new_token}', msg)
         except Exception as e:
             log(f"失败: 请检查接口{e}", msg)
         msg = "\n".join(msg)

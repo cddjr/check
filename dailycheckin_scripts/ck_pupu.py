@@ -129,7 +129,7 @@ class PUPU:
         try:
             self.token: str = self.check_item.get("token", "")
             if len(self.token) < 4:
-                raise ValueError("token配置有误")
+                raise SystemExit("token配置有误")
             msg += self.refreshAccessToken()
             if self.access_token:
                 msg += self.signIn()

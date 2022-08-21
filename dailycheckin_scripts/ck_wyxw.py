@@ -53,7 +53,7 @@ class WYXW:
             self.user_u = self.check_item.get("user_u")
             self.data = self.check_item.get("data")
             if not (self.user_u and self.data):
-                raise ValueError('user_u和data均要配置')
+                raise SystemExit('user_u和data均要配置')
             log(f'帐号信息: {name}', msg)
             msg += self.sign()
         except Exception as e:

@@ -118,7 +118,7 @@ class XQZ:
             cookies = self.check_item.get("cookie", "")
             token = cookie_to_dic(cookies).get("tzb_user_cryptograph")
             if not token:
-                raise ValueError("Cookie配置有误 必须有 tzb_user_cryptograph")
+                raise SystemExit("Cookie配置有误 必须有 tzb_user_cryptograph")
             # Cookie只需要 tzb_user_cryptograph 即可，只有它是5天有效期
             self.session.cookies.set(
                 "tzb_user_cryptograph", token, domain=".quxianzhuan.com")

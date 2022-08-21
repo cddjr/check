@@ -133,6 +133,7 @@ class RRTV:
                 for box in availBoxes:
                     randomSleep(max=3)
                     msg += self.__openBox(box["id"], box["name"])
+                msg += ['\n']  # md缩进后需要一个换行结束缩进
             else:
                 log(f'开宝箱失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
@@ -197,13 +198,18 @@ class RRTV:
         msg = []
         canDraw = False
         try:
+            weekNum = -1
             data = self.__getCheckinInfo()
             signDetailList = data.get("signDetailList", [])
             if len(signDetailList) > 0:
                 continueDays = str(signDetailList[0].get("continueDays", "-1"))
                 log(f'已连续签到: {continueDays}天', msg)
+                weekNum = int(signDetailList[0].get('weekNum', 0))
+            else:
+                # 本周没有签到
+                pass
             log(f'当前骰子: {data.get("diceCount")}个', msg)
-            while data.get("canOpenBag") == False and int(data.get("diceCount", 0)) > 0:
+            while weekNum == 7 and data.get("canOpenBag") == False and int(data.get("diceCount", 0)) > 0:
                 # 剧本不满足抽奖条件，但可以用骰子重置剧本
                 randomSleep(max=3)
                 resetSucc = False
@@ -218,10 +224,17 @@ class RRTV:
                 # 重置成功 则再循环一次判断
                 data = self.__getCheckinInfo()
                 log(f'- 剩余骰子: {data.get("diceCount")}个', msg)
-            if data.get("canOpenBag") == True and data.get("isOpenBag") == False:
-                # 本周没有抽过，可以抽奖
-                canDraw = True
-            log(f'是否可抽奖: {"是" if canDraw else "否"}', msg)
+            canOpenBag = data.get("canOpenBag")
+            isOpenBag = data.get("isOpenBag")
+            if canOpenBag == True:
+                if isOpenBag == False:
+                    # 本周礼盒可以抽奖了
+                    canDraw = True
+                    log('本周礼盒: 可以抽奖', msg)
+                else:
+                    log('本周礼盒: 开过的旧盒子', msg)
+            else:
+                log('本周礼盒: 尚未获得', msg)
         except Exception as e:
             log(f'解析签到异常: 请检查接口 {e}', msg)
 
@@ -269,6 +282,7 @@ class RRTV:
                 # 这是签到获得的勋章
                 for medal in data.get("medalList", []):
                     log(str(medal))
+                    # medal == '2_7'
                     # 至少目前客户端是这样写死只有小蜜蜂
                     log('签到奖励: 勋章 小蜜蜂7天', msg)
             elif obj["code"] == "8750":
@@ -284,7 +298,7 @@ class RRTV:
         try:
             self.token: str = self.check_item.get("token", "")
             if not self.token.startswith('rrtv-'):
-                raise ValueError('token配置有误 必须rrtv-开头')
+                raise SystemExit('token配置有误 必须rrtv-开头')
             msg += self.signIn()
             # 无论签到是否成功，我们继续执行，也许能抽奖
             info_msg, canDraw = self.getSignInfo()

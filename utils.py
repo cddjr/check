@@ -210,13 +210,13 @@ class check(object):
                 for value in value_list:
                     num += 1
                     print(f"<----------------账号【{num}】---------------->")
-                    username = value.get('username', value.get('name', value.get('email', value.get('phone'))))
+                    username = value.get('username') or value.get('name') or value.get('email') or value.get('phone')
                     if not username:
                         username = str(value)[:32] + "..."
                     print(f"获取到的账号信息为:{username}\n")
                     try:
                         result = func(value=value) + '\n\n'
-                        print(f"执行结果:\n{result}")
+                        # print(f"执行结果:\n{result}")
                         push_message += result
                     except IndexError:
                         print("可能是示例格式被运行\n错误信息:")
@@ -230,8 +230,9 @@ class check(object):
                     except TypeError:
                         print(f"{traceback.format_exc()}")
                         push_message += ''
-                    except SystemExit:
+                    except SystemExit as e:
                         # 脚本中执行exit不要影响其它账号的运行
+                        print(e)
                         push_message += ''
                     except BaseException:
                         # 未知异常，打印调用栈，继续执行下一个账号

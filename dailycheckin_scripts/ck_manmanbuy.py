@@ -8,7 +8,7 @@ https://apph5.manmanbuy.com/renwu/js/common.js
 
 """
 import traceback
-from utils import check, log, cookie_to_dic
+from utils import check, log
 from urllib3 import disable_warnings, Retry
 from requests.adapters import HTTPAdapter
 from requests.structures import CaseInsensitiveDict
@@ -75,6 +75,7 @@ class ManManBuy:
                 log(f'已连续签到: {data["zt"]}天', msg)
             elif int(obj["code"]) == 0 and '签到失败' == obj["msg"]:
                 log('重复签到: 忽略', msg)
+                exit()  # 目前没必要执行后续的操作
             else:
                 log(f'签到失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
@@ -98,29 +99,16 @@ class ManManBuy:
     def main(self):
         msg = []
         try:
-            cookies = self.check_item.get("cookie")
-            cookies = cookie_to_dic(cookies)
-            # cookies = urllib.parse.parse_qs(cookies, separator=';')
-            mmbuser = cookies.get("60014_mmbuser")
-            if not mmbuser:
-                raise ValueError("cookie配置有误 必须包含60014_mmbuser")
-            # for name, values in cookies.items():
-            #    self.session.cookies.set(name, values[0])
-            self.session.cookies.set("60014_mmbuser", mmbuser)
             info = urllib.parse.parse_qs(self.check_item.get("login"))
-            self.u_name = info.get('u_name', [''])[0]
-            self.u_token = info.get('u_token', [''])[0]
-            if not self.u_name:
-                # 兼容另一种格式的请求体
-                self.u_name = info.get('u', [''])[0]
-            if not self.u_token:
-                # 兼容另一种格式的请求体
-                self.u_token = info.get('sign', [''])[0]
-            if not (self.u_name and self.u_token):
-                raise ValueError("login配置有误 必须包含 u_name或u 和 u_token或sign")
-            # 设备id可以不同账号随机指定一个guid
-            self.c_devid = self.check_item.get("devid", self.c_devid)
-            self.username = self.check_item.get("name", self.c_devid)
+            u_name = info.get('u_name') or info.get('u')
+            u_token = info.get('u_token') or info.get('sign')
+            if not (u_name and u_token):
+                raise SystemExit("login配置有误 必须包含u_name和u_token")
+            self.u_name: str = u_name[0]
+            self.u_token: str = u_token[0]
+            # 设备id可以不同账号随机分配一个guid
+            self.c_devid = self.check_item.get("devid") or self.c_devid
+            self.username = self.check_item.get("name") or self.c_devid
 
             msg += self.login()
             msg += self.checkin()

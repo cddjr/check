@@ -568,6 +568,10 @@ def send(title: str, content: str) -> None:
         print(f"{title} 推送内容为空！")
         return
 
+    if title in os.getenv("NOTIFY_SKIP_LIST", "").split("&"):
+        print(f"{title} 已屏蔽推送")
+        return
+        
     hitokoto = push_config.get("HITOKOTO")
 
     content += "\n\n> " + one() if hitokoto else ""

@@ -55,19 +55,19 @@ AcFun | 百度搜索资源平台 | Bilibili | 天翼云盘 | CSDN | 多看阅读
 只使用dailycheckin_scripts：
 
 ```
-ql repo https://github.com/cddjr/check.git "ck_" "" "checksend|utils"
+ql repo https://github.com/cddjr/check.git "ck_|api_" "" "checksend|utils"
 ```
 
 只使用others_scripts：
 
 ```
-ql repo https://github.com/cddjr/check.git "oc_" "" "checksend|utils"
+ql repo https://github.com/cddjr/check.git "oc_|api_" "" "checksend|utils"
 ```
 
 我全都要:
 
 ```
-ql repo https://github.com/cddjr/check.git "ck_|oc_" "" "checksend|utils"
+ql repo https://github.com/cddjr/check.git "ck_|oc_|api_" "" "checksend|utils"
 ```
 
 ### 2.运行以下命令

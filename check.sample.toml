@@ -21,8 +21,14 @@
 ## 每日新闻
 #NEWS = true
 #
-## 青龙随机定时
-#QL_RANDOM_TIME = false
+# 随机定时
+# 青龙 id；青龙 api secret；青龙的接口链接；是否所有签到每日运行两次；需要定时的命令关键字
+[[RANDOM]]
+client_id = ""
+client_secret = ""
+url = "http://localhost:5700"
+twice = false
+keywords = "cddjr_check"
 #
 ## 天气预报
 #CITY = ["上海", "朝阳区"]

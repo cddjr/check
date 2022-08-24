@@ -44,7 +44,9 @@ class ClientApi(ABC):
         if self.twice:
             start = randrange(0, 12)
             return f"{start},{start + randrange(6, 12)}"
-        return str(randrange(0, 24))
+        # 由于部分脚本耗时可能超过30分钟
+        # 为了避免跨越0点 限制时间在晚上23点前
+        return str(randrange(0, 23))
 
     def random_time(self, origin_time: str, command: str):
         if command.find("ran_time") != -1:

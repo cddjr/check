@@ -110,14 +110,14 @@ class PUPU:
 
     def getPeriod(self):
         """
-        获得连续签到的天数
+        获得本周连续签到的天数
         """
         msg = []
         try:
             obj = self.__sendRequest("get", self.url_period_info)
             if obj["errcode"] == 0:
                 data = obj["data"]
-                log(f'连续签到: {data["signed_days"]}天', msg)
+                log(f'签到信息: 本周连续签到{data["signed_days"]}天', msg)
             else:
                 log(f'getPeriod失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:

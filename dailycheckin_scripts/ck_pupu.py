@@ -2,6 +2,10 @@
 """
 cron: 0 1,20 * * *
 new Env('朴朴');
+
+微信登录朴朴app 
+找到请求https://cauth.pupuapi.com/clientauth/user/society/wechat/login?user_society_type=11
+在json响应里有refresh_token
 """
 from utils import check, log
 from urllib3 import disable_warnings, Retry
@@ -83,6 +87,7 @@ class PUPU:
                 self.access_token = data.get('access_token', None)
                 log(f'账号: {nickname}', msg)
             else:
+                # 200208 登录已失效，请重新登录
                 log(f'刷新令牌失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:
             log(f'刷新令牌异常: 请检查接口 {e}', msg)

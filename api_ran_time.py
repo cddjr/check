@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 20220822 适配check仓库
+20220916 适配青龙2.13.9+
 :author @night-raise  from github
 cron: 0 0 */7 * *
 new Env('随机定时');
@@ -94,14 +95,18 @@ class QLClient(ClientApi):
             raise ValueError("无法获取 token！")
 
     def init_cron(self):
+        data = requests.get(
+            url=self.url + "open/crons",
+            headers={"Authorization": f"Bearer {self.token}"},
+        ).json()["data"]
+        if isinstance(data, dict):
+            # 兼容 v2.13.9+ 青龙
+            data = data["data"]
         self.cron: List[Dict] = list(
             filter(
                 lambda x: not x.get("isDisabled", 1)
                 and x.get("command", "").find(self.keywords) != -1,
-                requests.get(
-                    url=self.url + "open/crons",
-                    headers={"Authorization": f"Bearer {self.token}"},
-                ).json()["data"],
+                data,
             )
         )
 

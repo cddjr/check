@@ -51,7 +51,7 @@ class GIANT:
                 log(f'签到成功', msg)
             elif obj["status"] == 4:
                 log("重复签到: 忽略", msg)
-            else:  # 400000 请求参数不合法
+            else:
                 log(f'签到失败: status:{obj["status"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
             log(f'签到异常: 请检查接口 {e}', msg)
@@ -64,7 +64,7 @@ class GIANT:
         msg = []
         try:
             obj = self.__sendRequest("post", "https://e-gw.giant.com.cn/index.php/point_api/get_user_points",
-                                     {"user_id": self.user_id})
+                                     {"userid": self.user_id})
             if obj["status"] == 1:
                 points = obj["data"]
                 log(f'当前积分: {points}', msg)

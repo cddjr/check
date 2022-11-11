@@ -39,22 +39,22 @@ class GIANT:
                                                            url=url, headers=headers, data=data, json=json)
         return response.json()
 
-    def sign(self):
+    def sign(self, type: int):
         """
         签到
         """
         msg = []
         try:
             obj = self.__sendRequest("post", "https://opo.giant.com.cn/opo/index.php/day_pic/do_app_pic",
-                                     {"type": 1, "user_id": self.user_id})
+                                     {"type": type, "user_id": self.user_id})
             if obj["status"] == 1:
-                log(f'签到成功', msg)
+                log(f'{type}签到成功', msg)
             elif obj["status"] == 4:
-                log("重复签到: 忽略", msg)
+                log(f'{type}重复签到: 忽略', msg)
             else:
-                log(f'签到失败: status:{obj["status"]}, msg:{obj["msg"]}', msg)
+                log(f'{type}签到失败: status:{obj["status"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
-            log(f'签到异常: 请检查接口 {e}', msg)
+            log(f'{type}签到异常: 请检查接口 {e}', msg)
         return msg
 
     def getPoints(self):
@@ -80,7 +80,8 @@ class GIANT:
             self.user_id: str = self.check_item.get("user_id", "").strip()
             if len(self.user_id) < 4:
                 raise SystemExit("user_id 配置有误")
-            msg += self.sign()
+            msg += self.sign(type=1)  # 每日签到
+            msg += self.sign(type=3)  # 每日分享
             msg += self.getPoints()
         except Exception as e:
             log(f'失败: 请检查接口 {e}', msg)

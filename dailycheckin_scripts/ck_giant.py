@@ -3,7 +3,7 @@
 cron: 0 1,20 * * *
 new Env('捷安特');
 """
-from utils import check, log
+from utils import check, log, randomSleep
 from urllib3 import disable_warnings, Retry
 from requests.adapters import HTTPAdapter
 import requests
@@ -81,7 +81,10 @@ class GIANT:
             if len(self.user_id) < 4:
                 raise SystemExit("user_id 配置有误")
             msg += self.sign(type=1)  # 每日签到
-            msg += self.sign(type=3)  # 每日分享
+            randomSleep()
+            msg += self.sign(type=2)  # 每日分享
+            randomSleep()
+            msg += self.sign(type=3)  # 领取分享
             msg += self.getPoints()
         except Exception as e:
             log(f'失败: 请检查接口 {e}', msg)

@@ -35,7 +35,7 @@ class Meizu:
         response = self.session.get(
             url="https://myplus-api.meizu.cn/myplus-muc/u/user/v2", headers=headers).json()
         data = response.get("data", {})
-        return data["nickname"], data["mucUserId"]
+        return data.get("nickname", "-"), data.get("mucUserId", "-")
 
     def sign(self, cookie):
         headers = {

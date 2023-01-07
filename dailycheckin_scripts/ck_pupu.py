@@ -14,7 +14,7 @@ import requests
 
 
 class PUPU:
-    userAgent = "Pupumall/3.0.8;iOS 15.4.1"
+    userAgent = "Pupumall/3.2.3;iOS 15.4.1"
     api_host = "https://j1.pupuapi.com"
 
     url_sign = api_host + "/client/game/sign/v2?city_zip=510100&supplement_id="
@@ -85,7 +85,13 @@ class PUPU:
                 data = obj["data"]
                 nickname = data.get('nick_name', '未知')
                 self.access_token = data.get('access_token', None)
+                self.refresh_token = data.get('refresh_token', None)
                 log(f'账号: {nickname}', msg)
+                log(f'access_token:{self.access_token}')
+                if self.refresh_token == self.token :
+                    log('token没有变化')
+                else:
+                    log(f'新的token:{self.token}', msg)
             else:
                 # 200208 登录已失效，请重新登录
                 log(f'刷新令牌失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)

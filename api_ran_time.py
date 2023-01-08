@@ -50,7 +50,11 @@ class ClientApi(ABC):
         return str(randrange(0, 23))
 
     def random_time(self, origin_time: str, command: str):
-        if command.find("ran_time") != -1:
+        if command.find("ran_time") != -1 or command.find(" now") != -1:
+            # 排除自身或者明确定义了now参数的任务
+            return origin_time
+        if origin_time.find("-") != -1 or origin_time.find("/") != -1 or origin_time.find(",") != -1:
+            # 排除复杂的定时规则
             return origin_time
         if command.find("rssbot") != -1 or command.find("hax") != -1:
             return ClientApi.get_ran_min() + " " + " ".join(origin_time.split(" ")[1:])
@@ -125,6 +129,7 @@ class QLClient(ClientApi):
                 headers={"Authorization": f"Bearer {self.token}"},
             )
 
+
 @check(run_script_name="随机定时", run_script_expression="RANDOM")
 def main(*args, **kwargs):
     msg = []
@@ -136,6 +141,7 @@ def main(*args, **kwargs):
     except AttributeError:
         log("你的系统不支持运行随机定时！", msg)
     return "\n".join(msg)
+
 
 if __name__ == "__main__":
     main()

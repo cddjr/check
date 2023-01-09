@@ -172,9 +172,23 @@ class PUPU:
             log(f'get_receivers 异常: 请检查接口 {e}', msg)
         return msg
 
+    def product_to_pitem(self, product, count: int) -> PItem:
+        pitem = PItem()
+        pitem.price = int(product["price"])
+        pitem.product_id = str(product["product_id"])
+        pitem.store_product_id = str(product["id"])
+        pitem.spread_tag = int(product.get("spread_tag", 0))
+        pitem.selected_count = count
+        rms = product.get("order_remarks", [])
+        if len(rms) > 0:  # [杀(清洗), 杀(不清洗), 不杀
+            pitem.remark = str(rms[0])
+        else:
+            pitem.remark = ""
+        return pitem
+
     def add_cart(self, product, count: int):
         """
-        加购物车 目的是拿到 store_product_id
+        加购物车
         """
         pitem: PItem = None
         json = {
@@ -385,12 +399,23 @@ class PUPU:
                         count = 1
                         if len(gn) >= 3:
                             count = max(1, min(int(gn[2]), sq))
+                        flash_sale_info = p.get("flash_sale_info", {})
+                        if flash_sale_info:
+                            # 限购N件
+                            limit: int = flash_sale_info.get(
+                                "quantity_each_person_limit", 1)
+                            # 不能超过限购数
+                            count = min(count, limit)
                         log(f'检测到低价: {p["name"]} {price}元', price_msg)
                         if self.buy:
+                            """
                             add_msg, pitem = self.add_cart(p, count=count)
                             cart_msg += add_msg
+                            """
+                            pitem = self.product_to_pitem(p, count=count)
                             if pitem:
                                 order_items.append(pitem)
+
                 msg += price_msg
                 msg += cart_msg
                 if len(price_msg) > 0:

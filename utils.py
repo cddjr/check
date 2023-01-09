@@ -1,5 +1,6 @@
 import json
 import os
+import platform
 import random
 import re
 import sqlite3
@@ -74,6 +75,8 @@ class config_get(object):
             print('成功 当前环境为青龙面板v2.12- 继续执行\n')
             return ql_old
         else:
+            if platform.system() == "Windows":
+                return "D:\\"
             print('失败 请检查环境')
             exit(0)
 
@@ -321,6 +324,8 @@ def cookie_to_dic(cookie: str):
     return {item.split('=')[0]: item.split('=')[1] for item in cookie.split('; ')}
 
 
+"""
+没有必要在这里修改定时
 if __name__ == "__main__":
     pip_install()
     config = config_get()
@@ -332,3 +337,4 @@ if __name__ == "__main__":
     else:
         change_cron_new()
         print("修改完成请重启容器")
+"""

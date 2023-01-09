@@ -130,7 +130,7 @@ class QLClient(ClientApi):
             )
 
 
-@check(run_script_name="随机定时", run_script_expression="RANDOM")
+@check(run_script_name="随机定时", run_script_expression="RANDOM", interval_max=0)
 def main(*args, **kwargs):
     msg = []
     try:

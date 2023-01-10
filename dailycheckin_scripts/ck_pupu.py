@@ -8,7 +8,7 @@ new Env('朴朴');
 在json响应里有refresh_token
 """
 import sys
-from time import time
+from time import time, sleep
 from utils import check, log
 from urllib3 import disable_warnings, Retry
 from requests.adapters import HTTPAdapter
@@ -57,6 +57,12 @@ class PUPU:
 
     watch: bool = False
     PUSH_KEY: str = None
+
+    """
+    [[鱼, 10, 2], [瓜, 5, 3]]
+    鱼如果低于10元买2条
+    瓜如果低于5元买3个
+    """
     goods = []
 
     def __init__(self, check_item):
@@ -139,7 +145,7 @@ class PUPU:
                 time_last_order: int = -1
                 for r in data:
                     # r["is_in_service"] 意味地址是否可以配送
-                    if r.get("time_last_order", 0) > time_last_order:
+                    if r.get("is_default", False) or r.get("time_last_order", 0) > time_last_order:
                         time_last_order = int(r.get("time_last_order", 0))
                         self.store_id = str(r["service_store_id"])
                         self.receiver_id = str(r["id"])
@@ -364,22 +370,10 @@ class PUPU:
             log(f'订单创建异常: 请检查接口 {e}', msg)
         return msg
 
-    def checkGoods(self):
+    def checkGoods(self, retry_count: int):
         """
         从商品收藏列表中检测价格（根据收货地址判断库存）
         https://j1.pupuapi.com/client/user_behavior/product_collection/store/{store_id}/products?page=1&size=10
-            {
-                "errcode": 0,
-                "errmsg": "",
-                "data": {
-                    "count": 3, 总共收藏了多少商品
-                    "products": [
-                        {
-                            "id": "1c012c55-bd8f-4816-a37a-023ac42a4a4e",
-                            "price": 2990,  当前价格
-                            "stock_quantity": 0,  库存数量
-                            "market_price": 2990,  原价
-                            "name": "莱阳秋月梨1kg±50g/份",  名称
         """
         order_items = []
         msg = []
@@ -406,6 +400,7 @@ class PUPU:
                         price: float = p["price"] / 100
                         if price > gn[1]:
                             # 排除价格高于预期的
+                            log(f'价格高于预期: {p["name"]} {price}元 > {gn[1]}元')
                             continue
                         count = 1
                         if len(gn) >= 3:
@@ -432,9 +427,12 @@ class PUPU:
                 if len(price_msg) > 0:
                     text = "\n".join(price_msg)
                     msg += self.serverJ("朴朴降价了", text)
-                else:
+                elif retry_count <= 1:
                     log('无降价')
                     exit()
+                else:
+                    sleep(2)
+                    return self.checkGoods(retry_count=retry_count-1)
             else:
                 log(f'checkGoods 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:
@@ -622,7 +620,7 @@ class PUPU:
                         raise SystemExit("没有正确配置需要检测的商品")
                     msg += self.get_receivers()
                     if self.store_id and self.receiver_id and self.place_id:
-                        goods_msg, items = self.checkGoods()
+                        goods_msg, items = self.checkGoods(retry_count=3)
                         msg += goods_msg
                         if len(items) > 0:
                             dis_msg, dis_ids = self.discount(-1, items)

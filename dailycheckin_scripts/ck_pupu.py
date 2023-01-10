@@ -26,7 +26,12 @@ class PItem:
 
 class PUPU:
     version = "2023010301"
+    # 随机生成的guid
     device_id = "8C249B81-0974-4922-B512-53C4045C9851"
+    # 根据device_id生成的账户ID，在不同平台如微信小程序内也会返回相同账户ID
+    # 获取方式 GET https://j1.pupuapi.com/client/caccount/user/suid?device_id={device_id}
+    # {"errcode":0,"errmsg":"","data":"59754a9d-89b6-4f9e-9d9f-4f0c7287bd65"}
+    su_id = "59754a9d-89b6-4f9e-9d9f-4f0c7287bd65"
     userAgent = f"Pupumall/3.2.3;iOS 15.4.1;{device_id}"
 
     api_host = "https://j1.pupuapi.com"
@@ -90,6 +95,8 @@ class PUPU:
             headers["pp-userid"] = self.user_id
         if self.store_id:
             headers["pp_storeid"] = self.store_id
+        if self.su_id:
+            headers["pp-suid"] = self.su_id
 
         response: requests.Response = self.session.request(method,
                                                            url=url, headers=headers, data=data, json=json)
@@ -129,8 +136,11 @@ class PUPU:
                 "get", "https://j1.pupuapi.com/client/account/receivers")
             if obj["errcode"] == 0:
                 data = obj["data"]
+                time_last_order: int = -1
                 for r in data:
-                    if r["is_in_service"] or r["is_default"]:
+                    # r["is_in_service"] 意味地址是否可以配送
+                    if r.get("time_last_order", 0) > time_last_order:
+                        time_last_order = int(r.get("time_last_order", 0))
                         self.store_id = str(r["service_store_id"])
                         self.receiver_id = str(r["id"])
                         self.user_id = str(r.get("user_id", self.user_id))
@@ -160,8 +170,9 @@ class PUPU:
                                     "building_name", None)
                         if building_name and room_num:
                             self.recv_room_num = f'{building_name} {room_num}'
-
-                        break
+                        if r.get("is_default", False):
+                            # 如果是默认地址则直接用(似乎朴朴并没有设置)
+                            break
 
                 log(f'收货地址: {self.recv_addr} {self.recv_room_num}')
                 log(f'仓库ID: {self.store_id}')

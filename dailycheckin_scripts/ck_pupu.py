@@ -205,7 +205,7 @@ class PUPU:
 
     def add_cart(self, product, count: int):
         """
-        加购物车
+        加购物车(暂时用不上这个功能，弃用)
         """
         pitem: PItem = None
         json = {
@@ -247,9 +247,9 @@ class PUPU:
                     pitem.remark = str(item.get("remark", ""))
                     break
             else:
-                log(f'add_cart 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
+                log(f'加购失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:
-            log(f'add_cart 异常: 请检查接口 {e}', msg)
+            log(f'加购异常: 请检查接口 {e}', msg)
         return (msg, pitem)
 
     def get_delivery_time(self, pitems: list, min_hours: int):
@@ -402,6 +402,9 @@ class PUPU:
                             # 排除价格高于预期的
                             log(f'价格高于预期: {p["name"]} {price}元 > {gn[1]}元')
                             continue
+                        log(f'检测到低价: {p["name"]} {price}元', price_msg)
+                        if not self.buy:
+                            continue
                         count = 1
                         if len(gn) >= 3:
                             count = max(1, min(int(gn[2]), sq))
@@ -412,15 +415,13 @@ class PUPU:
                                 "quantity_each_person_limit", 1)
                             # 不能超过限购数
                             count = min(count, limit)
-                        log(f'检测到低价: {p["name"]} {price}元', price_msg)
-                        if self.buy:
-                            """
-                            add_msg, pitem = self.add_cart(p, count=count)
-                            cart_msg += add_msg
-                            """
-                            pitem = self.product_to_pitem(p, count=count)
-                            if pitem:
-                                order_items.append(pitem)
+                        """
+                        add_msg, pitem = self.add_cart(p, count=count)
+                        cart_msg += add_msg
+                        """
+                        pitem = self.product_to_pitem(p, count=count)
+                        if pitem:
+                            order_items.append(pitem)
 
                 msg += price_msg
                 msg += cart_msg
@@ -483,8 +484,6 @@ class PUPU:
                     if id:
                         ids.append(id)
             else:
-                # 200208 登录已失效，请重新登录
-                self.access_token = None
                 log(f'获取折扣失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:
             log(f'获取折扣异常: 请检查接口 {e}', msg)

@@ -7,9 +7,10 @@ new Env('朴朴');
 找到请求https://cauth.pupuapi.com/clientauth/user/society/wechat/login?user_society_type=11
 在json响应里有refresh_token
 """
+import random
 import sys
 from time import time, sleep
-from utils import check, log
+from utils import check, log, randomSleep
 from urllib3 import disable_warnings, Retry
 from requests.adapters import HTTPAdapter
 import requests
@@ -22,6 +23,16 @@ class PItem:
     remark: str
     spread_tag: int
     selected_count: int
+
+
+class PTask:
+    task_id: str
+    task_name: str  # 每日打卡
+    activity_id: str
+    task_type: int
+    action_type: int
+    skim_time: int  # 浏览多少秒
+    task_status: int  # 0未完成 30已浏览
 
 
 class PUPU:
@@ -550,7 +561,7 @@ class PUPU:
                 log(f'签到成功: 奖励积分+{data["daily_sign_coin"]} {data["reward_explanation"]}', msg)
             elif obj["errcode"] == 350011:
                 log("重复签到: 忽略", msg)
-                exit()  # 目前没必要执行后续的操作
+                # exit()  # 目前没必要执行后续的操作
             else:  # 400000 请求参数不合法
                 log(f'签到失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:
@@ -595,6 +606,156 @@ class PUPU:
         log(f'配置了{len(self.goods)}件商品的价格检测', msg)
         return msg
 
+    def get_lottery_info(self, id: str):
+        """
+        获得抽奖活动的信息
+        返回(名称, 任务列表)
+        """
+        activity_name: str = ""
+        tasks = []
+        try:
+            obj = self.__sendRequest(
+                "get", f'https://j1.pupuapi.com/client/game/custom_lottery/activities/{id}/element_configuration')
+            if obj["errcode"] == 0:
+                data = obj["data"]
+                activity_name = data["activity_name"]  # 开运新年签
+                task_system_link = data.get("task_system_link", {})
+                link_id = task_system_link.get("link_id", None)
+                if link_id:
+                    #
+                    self.session.proxies["https"] = "127.0.0.1:8888"
+                    obj = self.__sendRequest(
+                        "get", f'https://j1.pupuapi.com/client/game/task_system/user_tasks/task_groups/{link_id}')
+                    if obj["errcode"] == 0:
+                        data = obj["data"]
+                        tasks_json: list = data.get("tasks", [])
+                        for task_json in tasks_json:
+                            page_task_rule = task_json.get(
+                                "page_task_rule", None)
+                            if not page_task_rule:
+                                # 忽略非浏览型任务
+                                continue
+                            if not "task_status" in page_task_rule:
+                                continue
+                            task = PTask()
+                            task.task_name: str = task_json["task_name"]
+                            task.task_id: str = page_task_rule["task_id"]
+                            task.skim_time: int = page_task_rule["skim_time"]
+                            task.activity_id: str = page_task_rule["activity_id"]
+                            task.task_type: int = page_task_rule["task_type"]
+                            task.action_type: int = page_task_rule["action_type"]
+                            task.task_status: int = page_task_rule["task_status"]
+                            # 任务进度 [{finish_progress_value}/{task_progress_value}]
+                            # task_progress_value为0说明这个任务没有进度，一次即可
+                            tasks.append(task)
+                    else:
+                        log(
+                            f'{activity_name} 获取任务列表失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
+                else:
+                    log(f'{activity_name}: 无 link_id')
+            else:
+                log(
+                    f'get_lottery_info 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
+        except Exception as e:
+            log(f'get_lottery_info 异常: 请检查接口 {e}')
+        return (activity_name, tasks)
+
+    def get_lottery_chances(self, id: str) -> int:
+        """
+        获得抽奖次数
+        """
+        num: int = 0
+        try:
+            obj = self.__sendRequest(
+                "get", f'https://j1.pupuapi.com/client/game/custom_lottery/activities/{id}/user_chances')
+            if obj["errcode"] == 0:
+                num = obj["data"].get("remain_chance_num", 0)
+            else:
+                log(
+                    f'get_lottery_chances 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
+        except Exception as e:
+            log(f'get_lottery_chances 异常: 请检查接口 {e}')
+        return num
+
+    def do_lottery_task(self, task: PTask):
+        """
+        完成抽奖的任务
+        """
+        # 此任务从何时完成
+        time_end: int = (time() - random.randint(1, 8)) * 1000
+        # 此任务从何时开始
+        time_from: int = time_end - task.skim_time * \
+            1000 - random.randint(1, 20)
+
+        json = {
+            "activity_id": task.activity_id,
+            "task_type": task.task_type,
+            "action_type": task.action_type,
+            "task_id": task.task_id,
+            "time_from": time_from,
+            "time_end": time_end, }
+        try:
+            obj = self.__sendRequest(
+                "post", "https://j1.pupuapi.com/client/game/task_system/user_tasks/page_task_complete", json=json)
+            if obj["errcode"] == 0:
+                return True
+            else:
+                log(
+                    f'任务 {task.task_name} 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
+        except Exception as e:
+            log(f'任务 {task.task_name} 异常: 请检查接口 {e}')
+        return False
+
+    def do_lottery(self, id: str) -> str:
+        """
+        开始抽奖
+        """
+        try:
+            obj = self.__sendRequest(
+                "post", f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{id}/lottery?lng_x={self.lngX}&lat_y={self.latY}", json={})
+            if obj["errcode"] == 0:
+                return obj["data"].get("prize_remark", "Unknown")
+            else:
+                log(f'do_lottery 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
+        except Exception as e:
+            log(f'do_lottery 异常: 请检查接口 {e}')
+        return None
+
+    def lottery(self, id: str):
+        """
+        每日抽奖
+        """
+        msg = []
+        # 首先获取每日任务
+        activity_name, tasks = self.get_lottery_info(id)
+        if not activity_name:
+            log(f'抽奖异常: 拉取不到活动', msg)
+            return msg
+        # 然后开始做每日任务
+        log(f'正在进行 [{activity_name}]', msg)
+        # log(f'{activity_name} 任务数量: {len(tasks)}', msg)
+        for task in tasks:
+            ptask: PTask = task
+            if ptask.task_status == 0:
+                randomSleep(2, 5)
+            if ptask.task_status == 10 or task.task_status == 30 or self.do_lottery_task(task):
+                log(f'    {ptask.task_name}: 已完成')
+            elif ptask.task_status != 0:
+                log(f'    {ptask.task_name}: 已完成({ptask.task_status})')
+                continue
+        # 接着获取有多少次抽奖机会
+        changes = self.get_lottery_chances(id)
+        if changes > 0:
+            for i in range(changes):
+                randomSleep(1, 5)
+                prize = self.do_lottery(id)
+                if not prize:
+                    prize = "获得 未知"
+                log(f'  正在抽奖[{i+1}/{changes}]: {prize}')
+        else:
+            log('没有抽奖机会', msg)
+        return msg
+
     def main(self):
         msg = []
         try:
@@ -633,8 +794,13 @@ class PUPU:
                                                    delivery_time_type, time_delivery_promise)
                 else:
                     # 非价格检测模式，开始签到
+                    msg += self.get_receivers()  # 用于确定一些坐标、市场信息，后续一些操作可能需要用到
                     msg += self.signIn()
                     msg += self.getPeriod()
+                    lottery_id = self.check_item.get("lottery_id", None)
+                    if lottery_id:
+                        # 抽奖
+                        msg += self.lottery(id=lottery_id)
         except Exception as e:
             log(f'失败: 请检查接口 {e}', msg)
         msg = "\n".join(msg)

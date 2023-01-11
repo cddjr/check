@@ -749,8 +749,8 @@ class PUPU:
                 randomSleep(1, 5)
                 prize = self.do_lottery(id)
                 if not prize:
-                    prize = "获得 未知"
-                log(f'  正在抽奖[{i+1}/{changes}]: {prize}')
+                    prize = "获得未知"
+                log(f'  第 {i+1}/{changes} 次抽奖: {prize}', msg)
         else:
             log('没有抽奖机会', msg)
         return msg

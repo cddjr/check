@@ -762,6 +762,9 @@ class PUPU:
             if len(sys.argv) >= 2 and sys.argv[1] == "extra":
                 self.watch: bool = self.check_item.get("watch", False)
                 self.buy: bool = self.check_item.get("buy", False)
+                if not (self.watch or self.buy):
+                    log("忽略")
+                    exit()
             else:
                 self.watch = False
                 self.buy = False

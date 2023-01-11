@@ -622,8 +622,7 @@ class PUPU:
                 task_system_link = data.get("task_system_link", {})
                 link_id = task_system_link.get("link_id", None)
                 if link_id:
-                    #
-                    self.session.proxies["https"] = "127.0.0.1:8888"
+                    # self.session.proxies["https"] = "127.0.0.1:8888"
                     obj = self.__sendRequest(
                         "get", f'https://j1.pupuapi.com/client/game/task_system/user_tasks/task_groups/{link_id}')
                     if obj["errcode"] == 0:

@@ -759,12 +759,12 @@ class PUPU:
         msg = []
         try:
             # 是否要检测价格
-            self.watch: bool = self.check_item.get("watch", False)
-            if len(sys.argv) >= 2 and sys.argv[1] == "watch":
-                self.watch = True
-            self.buy: bool = self.check_item.get("buy", False)
-            if len(sys.argv) >= 2 and sys.argv[1] == "buy":
-                self.buy = True
+            if len(sys.argv) >= 2 and sys.argv[1] == "extra":
+                self.watch: bool = self.check_item.get("watch", False)
+                self.buy: bool = self.check_item.get("buy", False)
+            else:
+                self.watch = False
+                self.buy = False
 
             self.refresh_token: str = self.check_item.get("refresh_token", "")
             if len(self.refresh_token) < 4:

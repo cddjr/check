@@ -563,7 +563,7 @@ class PUPU:
                         log('无降价')
                         exit()
                     else:
-                        sleep(1)
+                        sleep(0.5)
                         return self.checkGoods(retry_count=retry_count-1)
             else:
                 log(f'checkGoods 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
@@ -902,7 +902,7 @@ class PUPU:
                     msg += self.get_receivers()
                     if self.store_id and self.receiver_id and self.place_id:
                         goods_msg, items, price_msg = self.checkGoods(
-                            retry_count=6)
+                            retry_count=10)
                         msg += goods_msg
                         if len(items) > 0:
                             dis_msg, dis_ids = self.discount(

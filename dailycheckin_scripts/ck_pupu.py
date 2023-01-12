@@ -7,6 +7,7 @@ new Env('朴朴');
 找到请求https://cauth.pupuapi.com/clientauth/user/society/wechat/login?user_society_type=11
 在json响应里有refresh_token
 """
+from enum import IntEnum, unique
 import random
 import sys
 from time import time, sleep
@@ -14,6 +15,122 @@ from utils import check, log, randomSleep
 from urllib3 import disable_warnings, Retry
 from requests.adapters import HTTPAdapter
 import requests
+
+
+@unique
+class BANNER_LINK_TYPE(IntEnum):
+    PRODUCT_DETAIL_ACTIVITY = 0
+    TOPIC_ACTIVITY = 10
+    SEARCH_RESULT_ACTIVITY = 90
+    DISCOVERY_DETAIL_ACTIVITY = 220
+    COUPON_DETAIL_ACTIVITY = 230
+    COUPON_LIST = 231
+    GOOD_NEIGHBOR_ACTIVITY = 250
+    ACTIVITY_ACTIVITY = 400
+    INDEX_TAB_ALL_CATEGORY = 410
+    FLASH_SALE_ACTIVITY = 650
+    SCENE_PRODUCT_LIST = 700
+    COOKBOOK_DETAIL = 900
+    COOKBOOK_LIST = 901
+    COOKBOOK_CHANNEL = 902
+    OPEN_MP_LIVE = 903
+    NO_JUMP = 910
+    INDEX = 999
+    USER_GIFT_CARD = 1000
+    MY_USER_GIFT_CARD = 1001
+    MY_COIN = 1010
+    CUSTOMER_CONTACT = 1011
+    DELIVER_ADDRESS = 1012
+    INVOICE_EXPENSE = 1013
+    DELIVER_BELL = 1014
+    MY_COLLECT = 1015
+    ABOUT_PUPU = 1016
+    SHARE_PUPU = 1017
+    USER_TASK = 1022
+    CUSTOM_LOTTERY = 1023
+    LOGIN_PAGE = 1024
+    SHARE_SELF = 1025
+    ORDER_DETAIL = 1030
+    IMPORTANT_PRODUCT_LIST = 2620
+    WEB = 99999
+
+
+@unique
+class ActionTYPE(IntEnum):
+    BROWSE = 0
+    SHARE = 10
+
+
+@unique
+class TaskRuleType(IntEnum):
+    Null = 0
+    Popup = 10
+    Scenes = 20
+
+
+@unique
+class TaskType(IntEnum):
+    FLASH_SALE = 240
+    CUSTOM_LOTTERY = 250
+    TOPIC = 260
+    USER_TASK = 270
+    SCENE = 280
+
+
+@unique
+class TaskStatus(IntEnum):
+    Undone = 0
+    Done = 10
+    Expired = 20
+    Receive = 30
+
+
+@unique
+class Error(IntEnum):
+    ERROR_TASK_NOT_GENERATED = 400104
+    ERROR_TASK_DOES_NOT_EXIST = 400106
+
+
+@unique
+class SPREAD_TAG(IntEnum):
+    UNKNOWN = -1  # 不限
+    NORMAL_PRODUCT = 0
+    NEW_PRODUCT = 10  # 新品
+    FLASH_SALE_PRODUCT = 20  # 限时购
+    DISCOUNT_PRODUCT = 30  # 折扣
+    NOVICE_PRODUCT = 40  # 新手专享
+    SPECIAL_PRODUCT = 50  # 特价
+    HOT_PRODUCT = 60  # 热卖
+    YIYUAN_BUTIE = 100
+    ZERO_ORDER_EXCLUSIVE = 110
+    ONE_ORDER_EXCLUSIVE = 120
+    TWO_ORDER_EXCLUSIVE = 130
+    THREE_ORDER_EXCLUSIVE = 140
+
+
+@unique
+class DiscountType(IntEnum):
+    ALL = -1  # 全部
+    ABSOLUTE = 0  # 满减
+    PERCENTAGE = 10  # 百分比折扣
+    GIFT_PRODUCT = 20  # 买赠
+    EACH_GIFT_PRODUCT = 30  # 每买赠
+    EACH_GIFT_MONEY = 40  # 每满减
+    TRADE_BUY = 50  # 换购
+
+
+@unique
+class PurchaseType(IntEnum):
+    ALL = -1  # 不限
+    GENERAL = 0  # 普通
+    RESERVE = 10  # 预定
+
+
+@unique
+class CART_ITEM_TYPE(IntEnum):
+    USUAL = 0
+    FREE_GIFT = 1
+    EXCHANGE = 2
 
 
 class PItem:
@@ -205,7 +322,8 @@ class PUPU:
         pitem.price = int(product["price"])
         pitem.product_id = str(product["product_id"])
         pitem.store_product_id = str(product["id"])
-        pitem.spread_tag = int(product.get("spread_tag", 0))
+        pitem.spread_tag = int(product.get(
+            "spread_tag", SPREAD_TAG.NORMAL_PRODUCT.value))
         pitem.selected_count = count
         rms = product.get("order_remarks", [])
         if len(rms) > 0:  # [杀(清洗), 杀(不清洗), 不杀
@@ -223,9 +341,9 @@ class PUPU:
             "store_product_id": product["id"],
             "selected_count": count,
             "current_price": int(product["price"]),
-            "type": 0,  # 是否对应 int(product["purchase_type"])
+            "type": CART_ITEM_TYPE.USUAL.value,
             "is_selected": True,
-            "product_tag": int(product.get("spread_tag", 0)),  # 不确定是不是这个
+            "product_tag": int(product.get("spread_tag", SPREAD_TAG.NORMAL_PRODUCT.value)),
             "product_id": product["product_id"],
         }
         ids = product.get("activity_ids", [])
@@ -277,7 +395,7 @@ class PUPU:
                     "price": pi.price,
                     "product_id": pi.product_id,
                     "batch_id": "",
-                    "discount_type": 0,  # TODO
+                    "discount_type": DiscountType.ABSOLUTE.value,  # 满减?
                     "is_gift": False,
                     "count": pi.selected_count,
                 }
@@ -408,10 +526,11 @@ class PUPU:
                         if sq <= 0:
                             # 排除没货的
                             continue
+                        # TODO: 若 p["sell_batches"] 不为空，则以该数组的最低价作为当前价格
                         price: float = p["price"] / 100
                         if price > gn[1]:
                             # 排除价格高于预期的
-                            log(f'价格高于预期: {p["name"]} {price}元 > {gn[1]}元')
+                            # log(f'价格高于预期: {p["name"]} {price}元 > {gn[1]}元')
                             continue
                         log(f'检测到低价: {p["name"]} {price}元', price_msg)
                         if not self.buy:
@@ -419,13 +538,16 @@ class PUPU:
                         count = 1
                         if len(gn) >= 3:
                             count = max(1, min(int(gn[2]), sq))
-                        flash_sale_info = p.get("flash_sale_info", {})
-                        if flash_sale_info:
-                            # 限购N件
-                            limit: int = flash_sale_info.get(
-                                "quantity_each_person_limit", 1)
-                            # 不能超过限购数
-                            count = min(count, limit)
+                        if p.get("spread_tag", SPREAD_TAG.NORMAL_PRODUCT.value) == SPREAD_TAG.FLASH_SALE_PRODUCT.value:
+                            flash_sale_info = p.get("flash_sale_info", {})
+                            progress_rate: float = flash_sale_info.get(
+                                "progress_rate", 0.0)
+                            if flash_sale_info and progress_rate < 1.0:
+                                # 限购N件
+                                limit: int = flash_sale_info.get(
+                                    "quantity_each_person_limit", 1)
+                                # 不能超过限购数
+                                count = min(count, limit)
                         """
                         add_msg, pitem = self.add_cart(p, count=count)
                         cart_msg += add_msg
@@ -443,7 +565,7 @@ class PUPU:
                     log('无降价')
                     exit()
                 else:
-                    sleep(2)
+                    sleep(1)
                     return self.checkGoods(retry_count=retry_count-1)
             else:
                 log(f'checkGoods 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
@@ -467,7 +589,7 @@ class PUPU:
                     "price": pi.price,
                     "product_id": pi.product_id,
                     "batch_id": "",
-                    "discount_type": 0,  # TODO
+                    "discount_type": DiscountType.ABSOLUTE.value,  # TODO
                     "store_product_id": pi.store_product_id,
                     "from_module": 0,
                     "is_gift": False,
@@ -735,16 +857,15 @@ class PUPU:
         # log(f'{activity_name} 任务数量: {len(tasks)}', msg)
         for task in tasks:
             ptask: PTask = task
-            if ptask.task_status == 0:
+            if ptask.task_status == TaskStatus.Undone:
                 randomSleep(2, 5)
                 if self.do_lottery_task(task):
                     log(f'    {ptask.task_name}: 已完成')
-            elif ptask.task_status != 10 and ptask.task_status != 30:
-                log(f'    {ptask.task_name}: 已完成({ptask.task_status})')
         randomSleep(2, 5)
         # 接着获取有多少次抽奖机会
         changes = self.get_lottery_chances(id)
         if changes > 0:
+            log(f' 当前有{changes}次抽奖机会', msg)
             for i in range(changes):
                 randomSleep(1, 5)
                 prize = self.do_lottery(id)
@@ -752,7 +873,7 @@ class PUPU:
                     prize = "获得未知"
                 log(f'  第 {i+1}/{changes} 次抽奖: {prize}', msg)
         else:
-            log('没有抽奖机会', msg)
+            log(' 没有抽奖机会', msg)
         return msg
 
     def main(self):
@@ -782,7 +903,7 @@ class PUPU:
                         raise SystemExit("没有正确配置需要检测的商品")
                     msg += self.get_receivers()
                     if self.store_id and self.receiver_id and self.place_id:
-                        goods_msg, items = self.checkGoods(retry_count=3)
+                        goods_msg, items = self.checkGoods(retry_count=5)
                         msg += goods_msg
                         if len(items) > 0:
                             dis_msg, dis_ids = self.discount(-1, items)

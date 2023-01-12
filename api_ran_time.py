@@ -24,6 +24,7 @@ class ClientApi(ABC):
         self.twice = False
         self.token = ""
         self.cron: List[Dict] = []
+        self.excluded: List[str] = []
 
     def init_cron(self):
         raise NotImplementedError
@@ -50,11 +51,12 @@ class ClientApi(ABC):
         return str(randrange(0, 23))
 
     def random_time(self, origin_time: str, command: str):
+        for keyword in self.excluded:
+            if command.find(keyword) != -1:
+                # 排除黑名单
+                return origin_time
         if command.find("ran_time") != -1 or command.find(" now") != -1:
             # 排除自身或者明确定义了now参数的任务
-            return origin_time
-        if origin_time.find("-") != -1 or origin_time.find("/") != -1 or origin_time.find(",") != -1:
-            # 排除复杂的定时规则
             return origin_time
         if command.find("rssbot") != -1 or command.find("hax") != -1:
             return ClientApi.get_ran_min() + " " + " ".join(origin_time.split(" ")[1:])
@@ -89,6 +91,7 @@ class QLClient(ClientApi):
             self.cid = cid
             self.sct = sct
             self.keywords = keywords
+        self.excluded = client_info.get("excluded", [])
         self.url = client_info.get("url", self.url).rstrip("/") + "/"
         self.twice = client_info.get("twice", False)
         self.token = requests.get(

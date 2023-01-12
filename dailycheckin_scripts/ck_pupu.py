@@ -737,11 +737,11 @@ class PUPU:
             ptask: PTask = task
             if ptask.task_status == 0:
                 randomSleep(2, 5)
-            if ptask.task_status == 10 or task.task_status == 30 or self.do_lottery_task(task):
-                log(f'    {ptask.task_name}: 已完成')
-            elif ptask.task_status != 0:
+                if self.do_lottery_task(task):
+                    log(f'    {ptask.task_name}: 已完成')
+            elif ptask.task_status != 10 and ptask.task_status != 30:
                 log(f'    {ptask.task_name}: 已完成({ptask.task_status})')
-                continue
+        randomSleep(2, 5)
         # 接着获取有多少次抽奖机会
         changes = self.get_lottery_chances(id)
         if changes > 0:

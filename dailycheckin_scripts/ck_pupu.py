@@ -506,6 +506,7 @@ class PUPU:
         """
         order_items = []
         msg = []
+        price_msg = []
         try:
             obj = self.__sendRequest(
                 "get", f"https://j1.pupuapi.com/client/user_behavior/product_collection/store/{self.store_id}/products?page=1&size=10")
@@ -515,7 +516,6 @@ class PUPU:
                 products: list = data.get("products", [])
                 log(f'总共收藏了{count}件商品')
 
-                price_msg = []
                 cart_msg = []
                 for p in products:
                     for gn in self.goods:
@@ -558,22 +558,20 @@ class PUPU:
 
                 msg += price_msg
                 msg += cart_msg
-                if len(price_msg) > 0:
-                    text = "\n".join(price_msg)
-                    msg += self.serverJ("朴朴降价了", text)
-                elif retry_count <= 1:
-                    log('无降价')
-                    exit()
-                else:
-                    sleep(1)
-                    return self.checkGoods(retry_count=retry_count-1)
+                if len(price_msg) == 0:
+                    if retry_count <= 1:
+                        log('无降价')
+                        exit()
+                    else:
+                        sleep(1)
+                        return self.checkGoods(retry_count=retry_count-1)
             else:
                 log(f'checkGoods 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:
             log(f'checkGoods 异常: 请检查接口 {e}', msg)
-        return (msg, order_items)
+        return (msg, order_items, price_msg)
 
-    def discount(self, type: int, items: list):
+    def discount(self, type: DiscountType, items: list):
         """
         获得最佳折扣
         """
@@ -608,7 +606,7 @@ class PUPU:
                 "order_items": order_items,
             }
             obj = self.__sendRequest(
-                "post", f"https://j1.pupuapi.com/client/account/discount?discount_type={type}", json=json)
+                "post", f"https://j1.pupuapi.com/client/account/discount?discount_type={type.value}", json=json)
             if obj["errcode"] == 0:
                 data = obj["data"]
                 if data.get("count", 0) > 0:
@@ -903,18 +901,25 @@ class PUPU:
                         raise SystemExit("没有正确配置需要检测的商品")
                     msg += self.get_receivers()
                     if self.store_id and self.receiver_id and self.place_id:
-                        goods_msg, items = self.checkGoods(retry_count=5)
+                        goods_msg, items, price_msg = self.checkGoods(
+                            retry_count=6)
                         msg += goods_msg
                         if len(items) > 0:
-                            dis_msg, dis_ids = self.discount(-1, items)
+                            dis_msg, dis_ids = self.discount(
+                                DiscountType.ALL, items)
                             msg += dis_msg
-                            if len(dis_ids) == 0:
-                                dis_msg, dis_ids = self.discount(30, items)
-                                msg += dis_msg
+                            # 不考虑了
+                            # if len(dis_ids) == 0:
+                            #    dis_msg, dis_ids = self.discount(DiscountType.EACH_GIFT_PRODUCT, items)
+                            #    msg += dis_msg
                             delivery_time_type, time_delivery_promise = self.get_delivery_time(
                                 items, 10)
                             msg += self.make_order(15, dis_ids, items,
                                                    delivery_time_type, time_delivery_promise)
+                        if len(price_msg) > 0:
+                            # 消息推送改到最后再发，避免错过机会
+                            price_text = "\n".join(price_msg)
+                            msg += self.serverJ("朴朴降价了", price_text)
                 else:
                     # 非价格检测模式，开始签到
                     msg += self.get_receivers()  # 用于确定一些坐标、市场信息，后续一些操作可能需要用到
@@ -930,7 +935,7 @@ class PUPU:
         return msg
 
 
-@check(run_script_name="朴朴", run_script_expression="pupu")
+@check(run_script_name="朴朴", run_script_expression="pupu", interval_max=0)
 def main(*args, **kwargs):
     return PUPU(check_item=kwargs.get("value")).main()
 

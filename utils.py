@@ -1,13 +1,13 @@
 import json
-import os
+import os, sys
 import platform
 import random
 import re
 import sqlite3
 import time
 import traceback
-# import tomli_w
 from functools import wraps
+from typing import Any, BinaryIO
 
 
 def pip_install():
@@ -17,9 +17,11 @@ def pip_install():
 
 try:
     import tomli
+    import tomli_w
 except ModuleNotFoundError:
     pip_install()
     import tomli
+    import tomli_w
 
 from checksendNotify import send
 
@@ -124,10 +126,19 @@ class config_get(object):
 
     def get_value(self, expression):
         real_key = self.get_real_key(expression)
+        return self.get_value_2(real_key)
+        
+    def get_value_2(self, real_key: str):
         if self.config_format == "toml":
             return self.get_value_for_toml(self.config_file, real_key)
         else:
             return self.get_value_for_json(self.config_file, real_key)
+        
+    def set_value(self, key:str, value: dict[str, Any]):
+        if self.config_format == "toml":
+            return self.set_value_for_toml(self.config_file, key, value)
+        else:
+            raise NotImplementedError
 
     @staticmethod
     def move_configuration_file_old():
@@ -150,6 +161,28 @@ class config_get(object):
                     f"错误：配置文件 {toml_path} 格式不对，请学习 https://toml.io/cn/v1.0.0\n错误信息：\n{traceback.format_exc()}"
                 )
                 exit(1)
+
+    @staticmethod
+    def set_value_for_toml(toml_path, key: str, value: dict[str, Any]):
+        f: BinaryIO = None
+        try:
+            with open(toml_path, "rb") as f:
+                try:
+                    toml_dict = tomli.load(f)
+                except tomli.TOMLDecodeError:
+                    print(f"错误：配置文件 {toml_path} 格式不对\n{traceback.format_exc()}")
+                    toml_dict = {}
+        except OSError:
+            toml_dict = {}
+        if not key in toml_dict:
+            toml_dict[key] = value
+        else:
+            toml_dict[key].update(value)
+        try:
+            with open(toml_path, "wb") as f:
+                tomli_w.dump(toml_dict, f)
+        except:
+            print(f"修改配置文件 {toml_path} 失败\n{traceback.format_exc()}")
 
     @staticmethod
     def get_value_for_json(json_path, key):
@@ -317,6 +350,22 @@ def log(s: str, msg_list=None):
     if msg_list is not None:
         msg_list += [s]
 
+
+def GetScriptConfig(suffix: str = ""):
+    """
+    获得当前脚本对应的配置文件
+    """
+    try:
+        dirname, filename = os.path.split(os.path.abspath(sys.argv[0]))
+        cache_dir = os.path.join(dirname, ".cache")
+        try:
+            os.mkdir(cache_dir)
+        except FileExistsError:
+            pass
+        return config_get(os.path.join(cache_dir, f"{filename}{suffix}.toml"))
+    except:
+        print(traceback.format_exc())
+        return None
 
 def cookie_to_dic(cookie: str):
     if not cookie:

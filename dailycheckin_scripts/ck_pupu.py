@@ -11,7 +11,7 @@ from enum import IntEnum, unique
 import random
 import sys
 from time import time, sleep
-from utils import check, log, randomSleep
+from utils import check, log, randomSleep, GetScriptConfig
 from urllib3 import disable_warnings, Retry
 from requests.adapters import HTTPAdapter
 import requests
@@ -163,7 +163,6 @@ class PUPU:
     userAgent = f"Pupumall/3.2.3;iOS 15.4.1;{device_id}"
 
     api_host = "https://j1.pupuapi.com"
-    url_sign = api_host + "/client/game/sign/v2?city_zip=510100&supplement_id="
     url_period_info = api_host + "/client/game/sign/period_info"
 
     url_get_token = 'https://cauth.pupuapi.com/clientauth/user/refresh_token'
@@ -174,6 +173,7 @@ class PUPU:
     store_id: str = None
     place_id: str = None
     user_id: str = None
+    store_city_zip: int = 0
     zip: int = 0
     lngX: float = 0
     latY: float = 0
@@ -219,7 +219,7 @@ class PUPU:
             "Connection": "keep-alive"
         }
         method = method.upper()
-        if self.access_token is not None:
+        if self.access_token:
             headers["Authorization"] = f'Bearer {self.access_token}'
         if self.place_id:
             headers["pp-placeid"] = self.place_id
@@ -288,8 +288,9 @@ class PUPU:
                             place.get("service_store_id", self.store_id))
                         self.lngX = float(place.get("lng_x", self.lngX))
                         self.latY = float(place.get("lat_y", self.latY))
-                        self.zip = int(place.get("zip", int(
-                            place.get("store_city_zip", 0))))
+                        self.store_city_zip = int(
+                            place.get("store_city_zip", 0))
+                        self.zip = int(place.get("zip", self.store_city_zip))
 
                         self.recv_name = str(r["name"])
                         self.recv_phone = str(r["mobile"])
@@ -653,6 +654,8 @@ class PUPU:
                 self.access_token: str = data.get('access_token', None)
                 self.user_id: str = data.get("user_id", "")
                 token: str = data.get('refresh_token', None)
+                self.config_dict["access_expires"] = int(
+                    data.get('expires_in', 0))
                 log(f'账号: {nickname}', msg)
                 log(f'access_token:{self.access_token}')
                 if self.refresh_token == token:
@@ -674,7 +677,8 @@ class PUPU:
         """
         msg = []
         try:
-            obj = self.__sendRequest("post", self.url_sign)
+            obj = self.__sendRequest(
+                "post", f"https://j1.pupuapi.com/client/game/sign/v2?city_zip={self.store_city_zip}&supplement_id=")
             if obj["errcode"] == 0:
                 data = obj["data"]
                 # 积分
@@ -874,6 +878,35 @@ class PUPU:
             log(' 没有抽奖机会', msg)
         return msg
 
+    def LoadConfig(self):
+        self.config_dict: dict = self.config.get_value_2(self.refresh_token)
+        self.access_expires = int(
+            self.config_dict.get("access_expires", 0))
+        if (time() + 3600.0) * 1000.0 > self.access_expires:
+            self.access_token = ""
+        else:
+            self.access_token = str(self.config_dict.get(
+                "access_token", self.access_token))
+        self.nickname = str(self.config_dict.get("nickname", ""))
+        self.su_id = str(self.config_dict.get("su_id", self.su_id))
+        self.store_id = str(self.config_dict.get(
+            "store_id", self.store_id))
+        self.place_id = str(self.config_dict.get(
+            "place_id", self.place_id))
+        self.user_id = str(self.config_dict.get("user_id", self.user_id))
+        self.store_city_zip = int(self.config_dict.get(
+            "store_city_zip", self.store_city_zip))
+
+    def SaveConfig(self):
+        self.config_dict["access_token"] = self.access_token
+        self.config_dict["nickname"] = self.nickname
+        self.config_dict["su_id"] = self.su_id
+        self.config_dict["store_id"] = self.store_id
+        self.config_dict["place_id"] = self.place_id
+        self.config_dict["user_id"] = self.user_id
+        self.config_dict["store_city_zip"] = self.store_city_zip
+        self.config.set_value(self.refresh_token, self.config_dict)
+
     def main(self):
         msg = []
         try:
@@ -884,16 +917,24 @@ class PUPU:
                 if not (self.watch or self.buy):
                     log("忽略")
                     exit()
+                self.config = GetScriptConfig("_extra")
             else:
                 self.watch = False
                 self.buy = False
+                self.config = GetScriptConfig()
 
             self.refresh_token: str = self.check_item.get("refresh_token", "")
             if len(self.refresh_token) < 4:
                 raise SystemExit("refresh_token配置有误")
             self.PUSH_KEY = self.check_item.get("PUSH_KEY", None)
 
-            msg += self.refreshAccessToken()
+            self.LoadConfig()
+
+            if not self.access_token:
+                self.user_id = ""
+                msg += self.refreshAccessToken()
+            else:
+                log(f'账号: {self.nickname}', msg)
             if self.access_token:
                 if self.watch or self.buy:
                     msg += self.parse_goods()
@@ -929,6 +970,8 @@ class PUPU:
                     if lottery_id:
                         # 抽奖
                         msg += self.lottery(id=lottery_id)
+
+            self.SaveConfig()
         except Exception as e:
             log(f'失败: 请检查接口 {e}', msg)
         msg = "\n".join(msg)

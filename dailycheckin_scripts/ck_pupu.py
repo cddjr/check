@@ -650,13 +650,13 @@ class PUPU:
                                      json={"refresh_token": self.refresh_token})
             if obj["errcode"] == 0:
                 data = obj["data"]
-                nickname: str = data.get('nick_name', '未知')
+                self.nickname: str = data.get('nick_name', '未知')
                 self.access_token: str = data.get('access_token', None)
                 self.user_id: str = data.get("user_id", "")
                 token: str = data.get('refresh_token', None)
                 self.config_dict["access_expires"] = int(
                     data.get('expires_in', 0))
-                log(f'账号: {nickname}', msg)
+                log(f'账号: {self.nickname}', msg)
                 log(f'access_token:{self.access_token}')
                 if self.refresh_token == token:
                     log('refresh_token没有变化')
@@ -931,6 +931,7 @@ class PUPU:
             self.LoadConfig()
 
             if not self.access_token:
+                log("重新获取access_token")
                 self.user_id = ""
                 msg += self.refreshAccessToken()
             else:

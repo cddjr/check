@@ -1,5 +1,7 @@
+from checksendNotify import send
 import json
-import os, sys
+import os
+import sys
 import platform
 import random
 import re
@@ -22,8 +24,6 @@ except ModuleNotFoundError:
     pip_install()
     import tomli
     import tomli_w
-
-from checksendNotify import send
 
 
 # def toml_to_json(toml_path, to_json_path):
@@ -127,14 +127,14 @@ class config_get(object):
     def get_value(self, expression):
         real_key = self.get_real_key(expression)
         return self.get_value_2(real_key)
-        
+
     def get_value_2(self, real_key: str):
         if self.config_format == "toml":
             return self.get_value_for_toml(self.config_file, real_key)
         else:
             return self.get_value_for_json(self.config_file, real_key)
-        
-    def set_value(self, key:str, value: dict[str, Any]):
+
+    def set_value(self, key: str, value: Any):
         if self.config_format == "toml":
             return self.set_value_for_toml(self.config_file, key, value)
         else:
@@ -148,7 +148,8 @@ class config_get(object):
     @staticmethod
     def move_configuration_file_new():
         print("移动配置文件")
-        os.system("cp /ql/data/repo/cddjr_check/check.sample.toml /ql/data/config/check.toml")
+        os.system(
+            "cp /ql/data/repo/cddjr_check/check.sample.toml /ql/data/config/check.toml")
 
     @staticmethod
     def get_value_for_toml(toml_path, key):
@@ -163,21 +164,25 @@ class config_get(object):
                 exit(1)
 
     @staticmethod
-    def set_value_for_toml(toml_path, key: str, value: dict[str, Any]):
+    def set_value_for_toml(toml_path, key: str, value: Any):
         f: BinaryIO = None
         try:
             with open(toml_path, "rb") as f:
                 try:
                     toml_dict = tomli.load(f)
                 except tomli.TOMLDecodeError:
-                    print(f"错误：配置文件 {toml_path} 格式不对\n{traceback.format_exc()}")
+                    print(
+                        f"错误：配置文件 {toml_path} 格式不对\n{traceback.format_exc()}")
                     toml_dict = {}
         except OSError:
             toml_dict = {}
-        if not key in toml_dict:
-            toml_dict[key] = value
+        if isinstance(value, dict):
+            if not key in toml_dict:
+                toml_dict[key] = value
+            else:
+                toml_dict[key].update(value)
         else:
-            toml_dict[key].update(value)
+            toml_dict[key] = value
         try:
             with open(toml_path, "wb") as f:
                 tomli_w.dump(toml_dict, f)
@@ -246,7 +251,8 @@ class check(object):
                 for value in value_list:
                     num += 1
                     print(f"<----------------账号【{num}】---------------->")
-                    username = value.get('username') or value.get('name') or value.get('email') or value.get('phone')
+                    username = value.get('username') or value.get(
+                        'name') or value.get('email') or value.get('phone')
                     if not username:
                         username = str(value)[:32] + "..."
                     print(f"获取到的账号信息为:{username}\n")
@@ -362,10 +368,14 @@ def GetScriptConfig(suffix: str = ""):
             os.mkdir(cache_dir)
         except FileExistsError:
             pass
-        return config_get(os.path.join(cache_dir, f"{filename}{suffix}.toml"))
+        config = config_get(os.path.join(
+            cache_dir, f"{filename}{suffix}.toml"))
+        config.set_value("Version", 1)
+        return config
     except:
         print(traceback.format_exc())
         return None
+
 
 def cookie_to_dic(cookie: str):
     if not cookie:

@@ -879,7 +879,7 @@ class PUPU:
         return msg
 
     def LoadConfig(self):
-        self.config_dict: dict = self.config.get_value_2(self.refresh_token)
+        self.config_dict: dict = self.config.get_value_2(self.refresh_token) or {}
         self.access_expires = int(
             self.config_dict.get("access_expires", 0))
         if (time() + 3600.0) * 1000.0 > self.access_expires:

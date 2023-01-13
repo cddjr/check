@@ -561,8 +561,8 @@ class PUPU:
                 msg += cart_msg
                 if len(price_msg) == 0:
                     if retry_count <= 1:
-                        log('无降价')
-                        exit()
+                        log('无降价', msg)
+                        # exit()
                     else:
                         sleep(0.5)
                         return self.checkGoods(retry_count=retry_count-1)
@@ -879,7 +879,8 @@ class PUPU:
         return msg
 
     def LoadConfig(self):
-        self.config_dict: dict = self.config.get_value_2(self.refresh_token) or {}
+        self.config_dict: dict = self.config.get_value_2(
+            self.refresh_token) or {}
         self.access_expires = int(
             self.config_dict.get("access_expires", 0))
         if (time() + 3600.0) * 1000.0 > self.access_expires:

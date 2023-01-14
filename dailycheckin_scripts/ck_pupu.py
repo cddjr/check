@@ -133,6 +133,56 @@ class CART_ITEM_TYPE(IntEnum):
     EXCHANGE = 2
 
 
+@unique
+class LOTTERY_TYPE(IntEnum):
+    SLOT = 10
+    FLOP = 20
+    DRAW = 30
+
+
+@unique
+class CHANCE_OBTAIN_TYPE(IntEnum):
+    RECEIVE_ORGER = 10
+    INVITE_NEW_USER = 20
+    COIN_EXCHANGE = 30  # 积分兑换
+    SIGN_IN = 40
+    INVITE_FRIEND_BOOST = 60  # 邀请助力
+    GO_TO_BOOST = 70
+
+
+@unique
+class DRAW_STATUS(IntEnum):
+    """
+    等同 SLOT_STATUS
+    """
+    INITIAL = 0
+    LOTTERY = 10
+    REWARD_SHOW = 40
+
+
+class PChanceEntrance:
+    type: CHANCE_OBTAIN_TYPE
+    title: str
+    attend_count: int  # 已获得次数
+    limit_count: int  # 最大获得次数
+    gain_num: int  # 每次完成可增加的次数
+    target_value: int  # 需要的数量
+
+
+@unique
+class RewardType(IntEnum):
+    Coupon = 10
+    PuPoint = 20
+    GiftCard = 30
+    Sunrise = 40
+
+
+class PPrize:
+    level: int
+    name: str
+    type: RewardType
+
+
 class PItem:
     price: int
     product_id: str
@@ -742,14 +792,33 @@ class PUPU:
         获得抽奖活动的信息
         返回(名称, 任务列表)
         """
+        lottery_type = LOTTERY_TYPE.DRAW
         activity_name: str = ""
-        tasks = []
+        tasks: list[PTask] = []
+        prize_info: dict[int, PPrize] = {}
         try:
             obj = self.__sendRequest(
                 "get", f'https://j1.pupuapi.com/client/game/custom_lottery/activities/{id}/element_configuration')
             if obj["errcode"] == 0:
                 data = obj["data"]
                 activity_name = data["activity_name"]  # 开运新年签
+                try:
+                    lottery_type = LOTTERY_TYPE(data["lottery_type"])
+                except ValueError as e:
+                    print(e)
+                for prize in data.get("prize_info", []):
+                    # 解析奖品
+                    if "prize_level" in prize and "prize_type" in prize \
+                            and "prize_name" in prize:
+                        p = PPrize()
+                        p.level = int(prize["prize_level"])
+                        p.name = str(prize["prize_name"])
+                        try:
+                            p.type = RewardType(prize["prize_type"])
+                        except ValueError as e:
+                            p.type = None
+                            print(e)
+                        prize_info[p.level] = p
                 task_system_link = data.get("task_system_link", {})
                 link_id = task_system_link.get("link_id")
                 if link_id:
@@ -781,13 +850,49 @@ class PUPU:
                         log(
                             f'{activity_name} 获取任务列表失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
                 else:
-                    log(f'{activity_name}: 无 link_id')
+                    log(f'{activity_name}: 没有配置每日任务')
             else:
                 log(
                     f'get_lottery_info 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
         except Exception as e:
             log(f'get_lottery_info 异常: 请检查接口 {e}')
-        return (activity_name, tasks)
+        return (activity_name, lottery_type, prize_info, tasks)
+
+    def get_lottery_chance_entrance(self, id: str):
+        coin_balance = 0
+        entrances: list[PChanceEntrance] = []
+        try:
+            obj = self.__sendRequest(
+                "get", f'https://j1.pupuapi.com/client/game/custom_lottery/activities/{id}/obtain_chance_entrance')
+            if obj["errcode"] == 0:
+                data = obj["data"]
+                coin_balance = int(data.get("coin_balance", 0))
+                for item in data.get("chance_obtain_entrance", []):
+                    if "code" in item and "attend_count" in item \
+                            and "limit_count" in item and "gain_num" in item \
+                            and "target_value" in item:
+                        pitem = PChanceEntrance()
+                        try:
+                            pitem.type = CHANCE_OBTAIN_TYPE(item["code"])
+                        except ValueError as e:
+                            print(e)
+                            continue
+                        pitem.title = str(item.get("title", "未知"))
+                        pitem.attend_count = int(item["attend_count"])
+                        pitem.limit_count = int(item["limit_count"])
+                        if pitem.attend_count >= pitem.limit_count:
+                            # 达到限制量 跳过
+                            log(f" {pitem.title} 达到限制 {pitem.limit_count} 跳过")
+                            continue
+                        pitem.target_value = int(item["target_value"])
+                        pitem.gain_num = int(item["gain_num"])
+                        entrances.append(pitem)
+            else:
+                log(
+                    f'get_lottery_chance_entrance 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
+        except Exception as e:
+            log(f'get_lottery_chance_entrance 异常: 请检查接口 {e}')
+        return (coin_balance, entrances)
 
     def get_lottery_chances(self, id: str) -> int:
         """
@@ -835,7 +940,7 @@ class PUPU:
             log(f'任务 {task.task_name} 异常: 请检查接口 {e}')
         return False
 
-    def do_lottery(self, id: str) -> str:
+    def do_lottery(self, id: str, prize_info: dict[int, PPrize]):
         """
         开始抽奖
         """
@@ -843,11 +948,29 @@ class PUPU:
             obj = self.__sendRequest(
                 "post", f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{id}/lottery?lng_x={self.lngX}&lat_y={self.latY}", json={})
             if obj["errcode"] == 0:
-                return obj["data"].get("prize_remark", "Unknown")
+                return prize_info.get(obj["data"]["prize_level"])
             else:
                 log(f'do_lottery 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
         except Exception as e:
             log(f'do_lottery 异常: 请检查接口 {e}')
+        return None
+
+    def do_coin_exchange(self, id: str, entrance: PChanceEntrance):
+        """
+        开始积分兑换
+        返回获得几次机会
+        """
+        try:
+            obj = self.__sendRequest(
+                "post", f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{id}/coin_exchange?lng_x={self.lngX}&lat_y={self.latY}", json={})
+            if obj["errcode"] == 0:
+                entrance.attend_count = entrance.attend_count + 1
+                return entrance.gain_num
+            else:
+                log(
+                    f'do_coin_exchange 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}')
+        except Exception as e:
+            log(f'do_coin_exchange 异常: 请检查接口 {e}')
         return None
 
     def lottery(self, id: str):
@@ -856,33 +979,88 @@ class PUPU:
         """
         msg = []
         # 首先获取每日任务
-        activity_name, tasks = self.get_lottery_info(id)
+        activity_name, lottery_type, prize_info, tasks = self.get_lottery_info(
+            id)
         if not activity_name:
             log(f'抽奖异常: 拉取不到活动', msg)
+            return msg
+        if lottery_type != LOTTERY_TYPE.DRAW:
+            log(f'活动类型不支持: {lottery_type}', msg)
             return msg
         # 然后开始做每日任务
         log(f'正在进行 [{activity_name}]', msg)
         # log(f'{activity_name} 任务数量: {len(tasks)}', msg)
         for task in tasks:
-            ptask: PTask = task
-            if ptask.task_status == TaskStatus.Undone:
+            if task.task_status == TaskStatus.Undone:
                 randomSleep(2, 5)
                 if self.do_lottery_task(task):
-                    log(f'    {ptask.task_name}: 已完成')
-        sleep(2)
+                    log(f'    {task.task_name}: 已完成')
+        coin_balance, chance_entrance = self.get_lottery_chance_entrance(id)
+        for chance in chance_entrance:
+            if chance.type == CHANCE_OBTAIN_TYPE.COIN_EXCHANGE:
+                count = 0
+                limit = int(self.check_item.get("coin_exchange", 0))
+                log(f' 积分兑换限制数: {limit}次', msg)
+                # 目前只支持积分兑换
+                while (coin_balance >= chance.target_value and count < limit):
+                    count = count + 1
+                    count = self.do_coin_exchange(id, chance)
+                    if count:
+                        coin_balance = coin_balance - chance.target_value
+                        log(f'    第{count}次{chance.title}: 成功兑换{count}次抽奖机会')
+                    else:
+                        break
+                if coin_balance < chance.target_value:
+                    log(f" 当前积分{coin_balance}少于{chance.target_value}, 停止兑换")
+        sleep(1)
         # 接着获取有多少次抽奖机会
         changes = self.get_lottery_chances(id)
         if changes > 0:
             log(f' 当前有{changes}次抽奖机会', msg)
             for i in range(changes):
                 randomSleep(1, 5)
-                prize = self.do_lottery(id)
-                if not prize:
+                prize = self.do_lottery(id, prize_info)
+                if prize:
+                    prize = prize.name
+                else:
                     prize = "获得未知"
                 log(f'  第{i+1}次抽奖: {prize}', msg)
         else:
             log(' 没有抽奖机会', msg)
         return msg
+
+    def find_lottery(self):
+        """
+        解析"我的"页面中的项目 找出抽奖活动
+        """
+        lottery_ids: list[str] = []
+        msg = []
+        try:
+            log("开始查找可用的抽奖活动")
+            obj = self.__sendRequest(
+                "get", f"https://j1.pupuapi.com/client/marketing/banner/v7?position_types=60%2C560%2C850%2C860%2C890&store_id={self.store_id}")
+            if obj["errcode"] == 0:
+                data = obj["data"]
+                for item in data:
+                    if int(item.get("link_type", 0)) == BANNER_LINK_TYPE.CUSTOM_LOTTERY:
+                        cur_time = int(time() * 1000)
+                        time_open = item.get("time_open", 0)
+                        time_close = item.get("time_close", cur_time + 60*1000)
+                        if cur_time < time_open or cur_time + 60*1000 > time_close:
+                            # 不在抽奖有效期内 忽略
+                            continue
+                        link_id = item.get("link_id")
+                        if link_id:
+                            title = item.get("title") or item.get("name")
+                            log(f" 找到抽奖: {title}")
+                            lottery_ids.append(link_id)
+                if len(lottery_ids) == 0:
+                    log("无抽奖活动")
+            else:
+                log(f'find_lottery 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
+        except Exception as e:
+            log(f'find_lottery 异常: 请检查接口 {e}')
+        return (msg, lottery_ids)
 
     def LoadConfig(self):
         self.config_dict: dict = self.config.get_value_2(
@@ -976,8 +1154,20 @@ class PUPU:
                     msg += self.get_receivers()  # 用于确定一些坐标、市场信息，后续一些操作可能需要用到
                     msg += self.signIn()
                     msg += self.getPeriod()
-                    lottery_id: str = self.check_item.get("lottery_id")
-                    if lottery_id:
+                    find_lottery: bool = self.check_item.get(
+                        "find_lottery", True)
+                    lottery_ids = []
+                    if find_lottery:
+                        msg2, lottery_ids = self.find_lottery()
+                        msg += msg2
+                    else:
+                        id = self.check_item.get("lottery_id")
+                        if id:
+                            if isinstance(id, str):
+                                lottery_ids.append(id)
+                            elif isinstance(id, list):
+                                lottery_ids = id
+                    for lottery_id in lottery_ids:
                         # 抽奖
                         msg += self.lottery(id=lottery_id)
 

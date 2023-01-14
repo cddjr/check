@@ -109,6 +109,25 @@ class SPREAD_TAG(IntEnum):
 
 
 @unique
+class DeliveryReasonType(IntEnum):
+    WEATHER = 0
+    PEAK = 1  # 因配送高峰, 配送时间有调整, 请耐心等待
+    OTHER = 2
+    PROLONG = 4
+    EXHAUSTED = 5  # 没有骑手?
+    FUTURE_PRODUCTS = 6
+    PROPERTY_PROBLEM = 100
+    TRAFFIC_PROBLEM = 200
+    LONG_DISTANCE = 300
+
+
+@unique
+class DeliveryTimeType(IntEnum):
+    IMMEDIATE = 0
+    RESERVE = 10
+
+
+@unique
 class DiscountType(IntEnum):
     ALL = -1  # 全部
     ABSOLUTE = 0  # 满减
@@ -440,7 +459,7 @@ class PUPU:
         return (msg, pitem)
 
     def get_delivery_time(self, pitems: list, min_hours: int):
-        delivery_time_type = 0
+        delivery_time_type = DeliveryTimeType.IMMEDIATE
         def_date = (time() + 1800) * 1000
         msg = []
         try:
@@ -466,9 +485,14 @@ class PUPU:
                 delivery_time_log = data["delivery_time_log"]
                 delivery_time_real: int = delivery_time_log.get(
                     "delivery_time_real", 30)
-                reason_type = delivery_time_log.get("reason_type", 0)
-                if reason_type == 6:
-                    delivery_time_type = 10
+                if "reason_type" in delivery_time_log:
+                    try:
+                        reason_type = DeliveryReasonType(
+                            delivery_time_log["reason_type"])
+                        if reason_type == DeliveryReasonType.FUTURE_PRODUCTS:
+                            delivery_time_type = DeliveryTimeType.RESERVE
+                    except ValueError as e:
+                        print(e)
                 time_group: list = data["time_group"]
                 date: int = time_group[0]["date"]  # 1673107200000
                 date_start: int = date + time_group[0]["start_min"] * 60000
@@ -486,9 +510,9 @@ class PUPU:
                     f'get_delivery_time 失败: code:{obj["errcode"]}, msg:{obj["errmsg"]}', msg)
         except Exception as e:
             log(f'get_delivery_time 异常: 请检查接口 {e}', msg)
-        return (int(delivery_time_type), int(def_date))
+        return (delivery_time_type, int(def_date))
 
-    def make_order(self, pay_type: int, coupon_ids: list, pitems: list, delivery_time_type: int, time_delivery_promise: int):
+    def make_order(self, pay_type: int, coupon_ids: list, pitems: list, delivery_time_type: DeliveryTimeType, time_delivery_promise: int):
         order_items = []
         for item in pitems:
             if not isinstance(item, PItem):
@@ -510,7 +534,7 @@ class PUPU:
             "buyer_id": self.user_id,
             "coin_payment_amount": 0,
             "wallet_payment_amount": 0,
-            "delivery_time_type": delivery_time_type,
+            "delivery_time_type": delivery_time_type.value,
             "device_id": self.device_id,
             "device_os": "20",
             "discount_entity_ids": coupon_ids,

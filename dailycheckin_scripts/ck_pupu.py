@@ -1017,7 +1017,7 @@ class PUPU:
                         log(f" 当前积分{coin_balance}少于{chance.target_value}, 放弃兑换")
                     # 目前只有一种类型的积分兑换
                     break
-            sleep(1)
+            sleep(2)
             # 接着获取有多少次抽奖机会
             changes = self.get_lottery_chances(id)
             if changes > 0:
@@ -1031,6 +1031,7 @@ class PUPU:
                         prize = "获得未知"
                     log(f'  第{i+1}次抽奖: {prize}', msg)
                 # 此时积分可能会增加一些 可以再尝试兑换
+                sleep(2)
                 continue
             else:
                 log(' 没有抽奖机会', msg)

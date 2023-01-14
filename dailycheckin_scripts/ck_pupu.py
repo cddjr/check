@@ -998,16 +998,17 @@ class PUPU:
         coin_balance, chance_entrance = self.get_lottery_chance_entrance(id)
         for chance in chance_entrance:
             if chance.type == CHANCE_OBTAIN_TYPE.COIN_EXCHANGE:
-                count = 0
-                limit = int(self.check_item.get("coin_exchange", 0))
-                log(f' 积分兑换限制数: {limit}次', msg)
+                exchange_count = 0
+                exchange_limit = int(self.check_item.get("coin_exchange", 0))
+                log(f' 积分兑换限制数: {exchange_limit}次', msg)
                 # 目前只支持积分兑换
-                while (coin_balance >= chance.target_value and count < limit):
-                    count = count + 1
+                while (coin_balance >= chance.target_value
+                       and exchange_count < exchange_limit):
+                    exchange_count = exchange_count + 1
                     count = self.do_coin_exchange(id, chance)
                     if count:
                         coin_balance = coin_balance - chance.target_value
-                        log(f'    第{count}次{chance.title}: 成功兑换{count}次抽奖机会')
+                        log(f'    第{exchange_count}次{chance.title}: 成功兑换{count}次抽奖机会')
                     else:
                         break
                 if coin_balance < chance.target_value:

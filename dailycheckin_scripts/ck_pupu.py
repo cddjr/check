@@ -997,8 +997,9 @@ class PUPU:
                     log(f'    {task.task_name}: 已完成')
         # 接着尝试积分兑换
         exchange_count = 0
-        coin_balance, chance_entrance = self.get_lottery_chance_entrance(id)
         while (True):
+            coin_balance, chance_entrance = self.get_lottery_chance_entrance(
+                id)
             for chance in chance_entrance:
                 if chance.type == CHANCE_OBTAIN_TYPE.COIN_EXCHANGE:
                     # 目前只支持积分兑换

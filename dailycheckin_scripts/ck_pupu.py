@@ -995,39 +995,45 @@ class PUPU:
                 randomSleep(2, 5)
                 if self.do_lottery_task(task):
                     log(f'    {task.task_name}: 已完成')
+        # 接着尝试积分兑换
+        exchange_count = 0
         coin_balance, chance_entrance = self.get_lottery_chance_entrance(id)
-        for chance in chance_entrance:
-            if chance.type == CHANCE_OBTAIN_TYPE.COIN_EXCHANGE:
-                exchange_count = 0
-                exchange_limit = int(self.check_item.get("coin_exchange", 0))
-                log(f' 积分兑换限制数: {exchange_limit}次', msg)
-                # 目前只支持积分兑换
-                while (coin_balance >= chance.target_value
-                       and exchange_count < exchange_limit):
-                    exchange_count = exchange_count + 1
-                    count = self.do_coin_exchange(id, chance)
-                    if count:
-                        log(f'    第{exchange_count}次{chance.title}: 成功兑换{count}次抽奖机会')
+        while (True):
+            for chance in chance_entrance:
+                if chance.type == CHANCE_OBTAIN_TYPE.COIN_EXCHANGE:
+                    # 目前只支持积分兑换
+                    while (coin_balance >= chance.target_value
+                           and exchange_count < self.exchange_limit):
+                        exchange_count = exchange_count + 1
+                        count = self.do_coin_exchange(id, chance)
+                        if count:
+                            log(f'    第{exchange_count}次{chance.title}: 成功兑换{count}次抽奖机会')
+                        else:
+                            break
+                        coin_balance, chance_entrance = self.get_lottery_chance_entrance(
+                            id)
+                    if coin_balance < chance.target_value:
+                        log(f" 当前积分{coin_balance}少于{chance.target_value}, 放弃兑换")
+                    # 目前只有一种类型的积分兑换
+                    break
+            sleep(1)
+            # 接着获取有多少次抽奖机会
+            changes = self.get_lottery_chances(id)
+            if changes > 0:
+                log(f' 当前有{changes}次抽奖机会', msg)
+                for i in range(changes):
+                    randomSleep(1, 5)
+                    prize = self.do_lottery(id, prize_info)
+                    if prize:
+                        prize = prize.name
                     else:
-                        break
-                    coin_balance, _ = self.get_lottery_chance_entrance(id)
-                if coin_balance < chance.target_value:
-                    log(f" 当前积分{coin_balance}少于{chance.target_value}, 停止兑换")
-        sleep(1)
-        # 接着获取有多少次抽奖机会
-        changes = self.get_lottery_chances(id)
-        if changes > 0:
-            log(f' 当前有{changes}次抽奖机会', msg)
-            for i in range(changes):
-                randomSleep(1, 5)
-                prize = self.do_lottery(id, prize_info)
-                if prize:
-                    prize = prize.name
-                else:
-                    prize = "获得未知"
-                log(f'  第{i+1}次抽奖: {prize}', msg)
-        else:
-            log(' 没有抽奖机会', msg)
+                        prize = "获得未知"
+                    log(f'  第{i+1}次抽奖: {prize}', msg)
+                # 此时积分可能会增加一些 可以再尝试兑换
+                continue
+            else:
+                log(' 没有抽奖机会', msg)
+                break
         return msg
 
     def find_lottery(self):
@@ -1168,6 +1174,10 @@ class PUPU:
                                 lottery_ids.append(id)
                             elif isinstance(id, list):
                                 lottery_ids = id
+                    if len(lottery_ids) > 0:
+                        self.exchange_limit = int(
+                            self.check_item.get("coin_exchange", 0))
+                        log(f' 积分兑换限制数: {self.exchange_limit}次', msg)
                     for lottery_id in lottery_ids:
                         # 抽奖
                         msg += self.lottery(id=lottery_id)

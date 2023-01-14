@@ -1007,10 +1007,10 @@ class PUPU:
                     exchange_count = exchange_count + 1
                     count = self.do_coin_exchange(id, chance)
                     if count:
-                        coin_balance = coin_balance - chance.target_value
                         log(f'    第{exchange_count}次{chance.title}: 成功兑换{count}次抽奖机会')
                     else:
                         break
+                    coin_balance, _ = self.get_lottery_chance_entrance(id)
                 if coin_balance < chance.target_value:
                     log(f" 当前积分{coin_balance}少于{chance.target_value}, 停止兑换")
         sleep(1)

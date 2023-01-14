@@ -296,16 +296,23 @@ class PUPU:
                         self.recv_phone = str(r["mobile"])
 
                         building_name: str = None
-                        room_num: str = r.get("room_num", None)
+                        room_num: str = r.get("room_num")
 
                         if place.get("have_building", False):
-                            place_building = r.get("place_building", None)
+                            place_building = r.get("place_building")
                             if place_building and place_building.get("is_deleted", False) == False:
                                 building_name = place_building.get(
-                                    "building_name", None)
+                                    "building_name")
                         if building_name and room_num:
                             self.recv_room_num = f'{building_name} {room_num}'
-                        if r.get("is_default", False):
+
+                        if self.addr_filter:
+                            # 配置了地址过滤
+                            if self.recv_addr.find(self.addr_filter) != -1:
+                                # 匹配上了
+                                break
+                            time_last_order = 0
+                        elif r.get("is_default", False):
                             # 如果是默认地址则直接用(似乎朴朴并没有设置)
                             break
 
@@ -515,7 +522,7 @@ class PUPU:
                 data = obj["data"]
                 count: int = data.get("count", 0)
                 products: list = data.get("products", [])
-                log(f'总共收藏了{count}件商品')
+                # log(f'总共收藏了{count}件商品')
 
                 cart_msg = []
                 for p in products:
@@ -612,7 +619,7 @@ class PUPU:
                 data = obj["data"]
                 if data.get("count", 0) > 0:
                     best_discount = data.get("best_discount", {})
-                    id = best_discount.get("id", None)
+                    id = best_discount.get("id")
                     if id:
                         ids.append(id)
             else:
@@ -651,9 +658,9 @@ class PUPU:
             if obj["errcode"] == 0:
                 data = obj["data"]
                 self.nickname: str = data.get('nick_name', '未知')
-                self.access_token: str = data.get('access_token', None)
+                self.access_token: str = data.get('access_token')
                 self.user_id: str = data.get("user_id", "")
-                token: str = data.get('refresh_token', None)
+                token: str = data.get('refresh_token')
                 self.config_dict["access_expires"] = int(
                     data.get('expires_in', 0))
                 log(f'账号: {self.nickname}', msg)
@@ -717,7 +724,7 @@ class PUPU:
         for key in self.check_item:
             if not key.startswith("goods"):
                 continue
-            value = self.check_item.get(key, None)
+            value = self.check_item.get(key)
             if not isinstance(value, list):
                 continue
             if not len(value) >= 2:
@@ -744,7 +751,7 @@ class PUPU:
                 data = obj["data"]
                 activity_name = data["activity_name"]  # 开运新年签
                 task_system_link = data.get("task_system_link", {})
-                link_id = task_system_link.get("link_id", None)
+                link_id = task_system_link.get("link_id")
                 if link_id:
                     # self.session.proxies["https"] = "127.0.0.1:8888"
                     obj = self.__sendRequest(
@@ -753,8 +760,7 @@ class PUPU:
                         data = obj["data"]
                         tasks_json: list = data.get("tasks", [])
                         for task_json in tasks_json:
-                            page_task_rule = task_json.get(
-                                "page_task_rule", None)
+                            page_task_rule = task_json.get("page_task_rule")
                             if not page_task_rule:
                                 # 忽略非浏览型任务
                                 continue
@@ -863,7 +869,7 @@ class PUPU:
                 randomSleep(2, 5)
                 if self.do_lottery_task(task):
                     log(f'    {ptask.task_name}: 已完成')
-        randomSleep(2, 5)
+        sleep(2)
         # 接着获取有多少次抽奖机会
         changes = self.get_lottery_chances(id)
         if changes > 0:
@@ -873,7 +879,7 @@ class PUPU:
                 prize = self.do_lottery(id)
                 if not prize:
                     prize = "获得未知"
-                log(f'  第 {i+1}/{changes} 次抽奖: {prize}', msg)
+                log(f'  第{i+1}次抽奖: {prize}', msg)
         else:
             log(' 没有抽奖机会', msg)
         return msg
@@ -916,7 +922,7 @@ class PUPU:
                 self.watch: bool = self.check_item.get("watch", False)
                 self.buy: bool = self.check_item.get("buy", False)
                 if not (self.watch or self.buy):
-                    log("忽略")
+                    log("当前账号没有启用价格监控或自动下单")
                     exit()
                 self.config = GetScriptConfig("_extra")
             else:
@@ -927,7 +933,9 @@ class PUPU:
             self.refresh_token: str = self.check_item.get("refresh_token", "")
             if len(self.refresh_token) < 4:
                 raise SystemExit("refresh_token配置有误")
-            self.PUSH_KEY = self.check_item.get("PUSH_KEY", None)
+            self.PUSH_KEY = self.check_item.get("PUSH_KEY")
+
+            self.addr_filter: str = self.check_item.get("addr_filter")
 
             self.LoadConfig()
 
@@ -968,7 +976,7 @@ class PUPU:
                     msg += self.get_receivers()  # 用于确定一些坐标、市场信息，后续一些操作可能需要用到
                     msg += self.signIn()
                     msg += self.getPeriod()
-                    lottery_id = self.check_item.get("lottery_id", None)
+                    lottery_id: str = self.check_item.get("lottery_id")
                     if lottery_id:
                         # 抽奖
                         msg += self.lottery(id=lottery_id)

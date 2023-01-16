@@ -1,2 +1,10 @@
 
 __pycache__/
+
+.vscode/
+
+.cache/
+
+*.toml.lock
+
+dailycheckin_scripts/check.toml

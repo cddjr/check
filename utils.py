@@ -10,6 +10,7 @@ import time
 import traceback
 from functools import wraps
 from typing import Any, BinaryIO
+from fasteners.process_lock import InterProcessReaderWriterLock
 
 
 def pip_install():
@@ -59,6 +60,7 @@ class config_get(object):
         else:
             self.config_file = custom_path
             self.config_format = self.get_config_format()
+        self.lock_ = InterProcessReaderWriterLock(f'{self.config_file}.lock')
 
     def get_config_format(self):
         if self.config_file.endswith('.toml'):
@@ -78,7 +80,7 @@ class config_get(object):
             return ql_old
         else:
             if platform.system() == "Windows":
-                return "D:\\"
+                return ""
             print('失败 请检查环境')
             exit(0)
 
@@ -110,14 +112,15 @@ class config_get(object):
         """
         pattern = re.compile(expression, re.I)
         real_key = ''
-        if self.config_format == "toml":
-            for key in self.get_key_for_toml(self.config_file):
-                if pattern.match(key) is not None:
-                    real_key = key
-        else:
-            for key in self.get_key_for_json(self.config_file):
-                if pattern.match(key) is not None:
-                    real_key = key
+        with self.lock_.read_lock():
+            if self.config_format == "toml":
+                for key in self.get_key_for_toml(self.config_file):
+                    if pattern.match(key) is not None:
+                        real_key = key
+            else:
+                for key in self.get_key_for_json(self.config_file):
+                    if pattern.match(key) is not None:
+                        real_key = key
         if real_key != '':
             return real_key
         else:
@@ -129,16 +132,18 @@ class config_get(object):
         return self.get_value_2(real_key)
 
     def get_value_2(self, real_key: str):
-        if self.config_format == "toml":
-            return self.get_value_for_toml(self.config_file, real_key)
-        else:
-            return self.get_value_for_json(self.config_file, real_key)
+        with self.lock_.read_lock():
+            if self.config_format == "toml":
+                return self.get_value_for_toml(self.config_file, real_key)
+            else:
+                return self.get_value_for_json(self.config_file, real_key)
 
     def set_value(self, key: str, value: Any):
-        if self.config_format == "toml":
-            return self.set_value_for_toml(self.config_file, key, value)
-        else:
-            raise NotImplementedError
+        with self.lock_.write_lock():
+            if self.config_format == "toml":
+                return self.set_value_for_toml(self.config_file, key, value)
+            else:
+                raise NotImplementedError
 
     @staticmethod
     def move_configuration_file_old():
@@ -357,19 +362,19 @@ def log(s: str, msg_list=None):
         msg_list += [s]
 
 
-def GetScriptConfig(suffix: str = ""):
+def GetScriptConfig(filename: str):
     """
     获得当前脚本对应的配置文件
     """
     try:
-        dirname, filename = os.path.split(os.path.abspath(sys.argv[0]))
+        dirname = os.path.dirname(os.path.abspath(sys.argv[0]))
         cache_dir = os.path.join(dirname, ".cache")
         try:
-            os.mkdir(cache_dir)
-        except FileExistsError:
-            pass
-        config = config_get(os.path.join(
-            cache_dir, f"{filename}{suffix}.toml"))
+            os.makedirs(cache_dir)
+        except OSError:
+            if not os.path.isdir(cache_dir):
+                raise
+        config = config_get(os.path.join(cache_dir, f"{filename}.toml"))
         config.set_value("Version", 1)
         return config
     except:

@@ -1135,11 +1135,10 @@ class PUPU:
                 if not (self.watch or self.buy):
                     log("当前账号没有启用价格监控或自动下单")
                     exit()
-                self.config = GetScriptConfig("_extra")
             else:
                 self.watch = False
                 self.buy = False
-                self.config = GetScriptConfig()
+            self.config = GetScriptConfig("pupu")
 
             self.refresh_token: str = self.check_item.get("refresh_token", "")
             if len(self.refresh_token) < 4:

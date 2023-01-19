@@ -10,7 +10,7 @@ assert py_version >= (3, 10)
 
 class ClientBase(object):
 
-    __slots__ = ("__session", "__receiver")
+    #__slots__ = ("__session", "__receiver")
 
     def __init__(self, device_id: str):
         assert device_id

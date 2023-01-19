@@ -18,7 +18,7 @@ assert sys.version_info >= (3, 10)
 
 
 class PUPU:
-    __slots__ = ("api", "config_dict")
+    #__slots__ = ("api", "config_dict", "check_item", "config", "refresh_token_user_specified")
 
     nickname: str | None = None
     avatar: str | None = None

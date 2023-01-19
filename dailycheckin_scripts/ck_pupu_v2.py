@@ -13,7 +13,6 @@ from traceback import format_exception
 from pupu_api import Api
 from pupu_types import *
 import asyncio
-import random
 import sys
 assert sys.version_info >= (3, 10)
 

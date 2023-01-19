@@ -17,7 +17,8 @@ from asyncio import sleep as aio_sleep
 
 def pip_install():
     print("正在安装依赖")
-    os.system("pip3 install requests rsa tomli tomli_w beautifulsoup4")
+    os.system(
+        "pip3 install requests rsa tomli tomli_w beautifulsoup4 aiohttp aiohttp_retry")
 
 
 try:
@@ -424,10 +425,10 @@ class default:
         return cls
 
 
-"""
-没有必要在这里修改定时
 if __name__ == "__main__":
     pip_install()
+    if platform.system() == "Windows":
+        exit()
     config = config_get()
     if config.config_path == "/ql/config/":
         if os.path.isfile("/ql/db/database.sqlite"):
@@ -437,4 +438,3 @@ if __name__ == "__main__":
     else:
         change_cron_new()
         print("修改完成请重启容器")
-"""

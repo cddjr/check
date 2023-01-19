@@ -52,12 +52,8 @@ class PUPU:
 
         self.api = Api(self.device_id,
                        self.refresh_token,
+                       self.config_dict.get("access_token"),
                        self.config_dict.get("access_expires", 0))
-
-        if (time() + 360.0) * 1000.0 > self.api.expires_in:
-            self.api.access_token = None
-        else:
-            self.api.access_token = self.config_dict.get("access_token")
 
         self.api.su_id = self.config_dict.get("su_id")
         self.api.receiver = PReceiverInfo(
@@ -113,7 +109,7 @@ class PUPU:
         if isinstance(task_groups, ApiResults.Error):
             log(task_groups, msg)
         elif not task_groups.tasks:
-            log(f'{info.lottery.name}: 没有配置任务')
+            log(' 没有配置任务')
         else:
             # 然后开始做任务
             for task in task_groups.tasks:
@@ -209,18 +205,18 @@ class PUPU:
 
             self.LoadConfig()
 
-            if not self.api.access_token:
-                log("重新获取 access_token")
-                self.api.user_id = None
-                result = await self.api.RefreshAccessToken()
-                if isinstance(result, ApiResults.Error):
-                    log(result, msg)
-                    raise self.Leave
-                elif result.refresh_token != self.refresh_token:
+            result = await self.api.RefreshAccessToken()
+            if isinstance(result, ApiResults.Error):
+                log(result, msg)
+                raise self.Leave
+            elif isinstance(result, ApiResults.TokenRefreshed):
+                if result.refresh_token != self.refresh_token:
                     self.refresh_token = result.refresh_token
-                    log(f"令牌已更新为: {result.refresh_token}")
-                self.nickname = self.api.nickname
+                    log(f"refresh_token 已更新为: {result.refresh_token}")
+                else:
+                    log(f"令牌已更新为: {self.api.access_token}")
 
+            self.nickname = self.api.nickname
             log(f'账号: {self.nickname}', msg)
 
             # 确保收货地址总是最新的

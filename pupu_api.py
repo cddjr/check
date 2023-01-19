@@ -1,6 +1,6 @@
 from pupu_types import *
 from utils import log
-from asyncio import sleep as aio_sleep
+from asyncio import sleep as aio_sleep, gather as aio_gather
 from aiohttp_retry import RetryClient, JitterRetry
 from random import randint
 from time import time
@@ -17,6 +17,7 @@ class ClientBase(object):
         self.__device_id = device_id
         self.__su_id = self.__access_token = self.__user_id = None
         self.__receiver = None
+        self.__server_date_diff = None
         self.__init_http()
 
     def __init_http(self):
@@ -77,11 +78,11 @@ class ClientBase(object):
         elif "pp-suid" in self.__session._client.headers:
             del self.__session._client.headers["pp-suid"]
 
-    @ property
+    @property
     def user_id(self):
         return self.__user_id
 
-    @ user_id.setter
+    @user_id.setter
     def user_id(self, id: None | str):
         self.__user_id = id
         if id:
@@ -89,7 +90,7 @@ class ClientBase(object):
         elif "pp-userid" in self.__session._client.headers:
             del self.__session._client.headers["pp-userid"]
 
-    @ property
+    @property
     def receiver(self):
         return self.__receiver
 
@@ -105,6 +106,40 @@ class ClientBase(object):
             self.__session._client.headers["pp_storeid"] = receiver.store_id
         elif "pp_storeid" in self.__session._client.headers:
             del self.__session._client.headers["pp_storeid"]
+
+    async def GetServerTime(self):
+        """获得与服务器尽可能一致的时间戳"""
+        if self.__server_date_diff is None:
+            result = await self.ComputeServerTimeDiff()
+            if isinstance(result, ApiResults.Error):
+                log(result)
+                return int(time()*1000)
+            else:
+                self.__server_date_diff = result
+        return int(time()*1000 + self.__server_date_diff)
+
+    async def ComputeServerTimeDiff(self):
+        """计算本地时间与服务器时间的时间差"""
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kGet,
+                "https://j1.pupuapi.com/client/base/data",
+                client=ClientType.kWeb,
+                headers={"Origin": "https://ma.pupumall.com",
+                         "Referer": "https://ma.pupumall.com/"}
+            )
+            if obj["errcode"] == 0:
+                data = obj["data"]
+                if "server_time" not in data:
+                    raise ValueError("server_time 没了")
+                server_time = int(data["server_time"])
+                diff = server_time - int(time() * 1000)
+                log(f"当前与服务器的时间差在{diff}毫秒内")
+                return diff
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception as e:
+            return ApiResults.Error(exception=e)
 
     async def _SendRequest(self, method: HttpMethod, url: str,
                            client=ClientType.kNative,
@@ -131,18 +166,25 @@ class ClientBase(object):
             ssl=False, method=method.value, url=url, headers=req_headers,
             params=params, data=data, json=json
         ) as response:
+            # server_date = response.headers.getone("Date", None)
+            # if server_date:
+            #    from datetime import datetime
+            #    from email.utils import parsedate
+            #    parsedate(server_date)
             return await response.json()
 
 
 class Api(ClientBase):
 
-    def __init__(self, device_id: str, refresh_token: str, expires_in: int):
+    def __init__(self, device_id: str, refresh_token: str,
+                 access_token: None | str, expires_in: None | int):
         if not (device_id and refresh_token):
             raise ValueError("参数没有正确设置")
         super().__init__(device_id=device_id)
         self.__refresh_token: None | str = refresh_token
         self.__nickname: None | str = None
-        self.__expires_in = expires_in
+        self.__expires_in = expires_in or 0
+        self.access_token = access_token
 
     @property
     def nickname(self):
@@ -166,6 +208,12 @@ class Api(ClientBase):
 
     async def RefreshAccessToken(self):
         """刷新AccessToken 有效期通常只有2小时"""
+        current_time = await self.GetServerTime()
+        if self.access_token and current_time + 360_000 < self.expires_in:
+            # access_token 有效
+            return ApiResults.TokenValid()
+        self.access_token = None
+        self.user_id = None
         try:
             obj = await self._SendRequest(
                 HttpMethod.kPut,
@@ -181,10 +229,9 @@ class Api(ClientBase):
                     "refresh_token", self.__refresh_token)
                 self.__expires_in = int(data.get('expires_in', 0))
                 self.__nickname = data.get("nick_name")
-                return ApiResults.RefreshToken(refresh_token=self.__refresh_token,
-                                               access_expires=self.__expires_in)
+                return ApiResults.TokenRefreshed(refresh_token=self.__refresh_token,
+                                                 access_expires=self.__expires_in)
             else:
-                self.access_token = None
                 if obj["errcode"] == 403 \
                         or (obj["errcode"] != 200099 and obj["errcode"] in range(200000, 300000)):
                     self.__refresh_token = None
@@ -334,12 +381,12 @@ class Api(ClientBase):
     async def GetBanner(self, link_type: BANNER_LINK_TYPE, position_types: None | list[int | str] = None):
         assert self.receiver
         try:
-            obj = await self._SendRequest(
+            co_req = self._SendRequest(
                 HttpMethod.kGet,
                 "https://j1.pupuapi.com/client/marketing/banner/v7",
                 params={"position_types": ",".join(str(p) for p in position_types) if position_types else -1,
-                        "store_id": self.receiver.store_id}
-            )
+                        "store_id": self.receiver.store_id})
+            now, obj = await aio_gather(self.GetServerTime(), co_req)
             if obj["errcode"] == 0:
                 link_ids = set[str]()
                 banners = []
@@ -347,10 +394,9 @@ class Api(ClientBase):
                 for item in data:
                     if "link_type" in item \
                             and BANNER_LINK_TYPE(item["link_type"]) == link_type:
-                        cur_time = int(time() * 1000)
                         time_open = item.get("time_open", 0)
-                        time_close = item.get("time_close", cur_time + 60*1000)
-                        if cur_time < time_open or cur_time + 60*1000 > time_close:
+                        time_close = item.get("time_close", now + 60_000)
+                        if now < time_open or now + 60_000 > time_close:
                             # 不在效期内 忽略
                             continue
                         link_id = item.get("link_id")
@@ -460,7 +506,7 @@ class Api(ClientBase):
     async def PostPageTaskComplete(self, lottery: PLotteryInfo, task: PTask):
         """完成浏览任务"""
         # 此任务从何时完成
-        time_end: int = (time() - randint(1, 8)) * 1000
+        time_end: int = await self.GetServerTime() - randint(1, 8) * 1000
         # 此任务从何时开始
         time_from: int = time_end - task.skim_time * 1000 - randint(1, 20)
 
@@ -641,7 +687,6 @@ class Api(ClientBase):
 
     async def GetDeliveryTime(self, products: list[PProduct], start_hours: int):
         assert self.receiver
-        # delivery_date = (time() + 1800) * 1000
         try:
             json = []
             for pi in products:
@@ -653,15 +698,14 @@ class Api(ClientBase):
                     "is_gift": False,
                     "count": pi.selected_count,
                 }
-                json.append(obj)
-            obj = await self._SendRequest(
+            co_req = self._SendRequest(
                 HttpMethod.kPost,
                 "https://j1.pupuapi.com/client/deliverytime/v4",
                 params={"place_id": self.receiver.place_id,
                         "scene_type": 0,
                         "store_id": self.receiver.store_id},
-                json=json
-            )
+                json=json)
+            now, obj = await aio_gather(self.GetServerTime(), co_req)
             if obj["errcode"] == 0:
                 dtime_type = DeliveryTimeType.IMMEDIATE
                 data = obj["data"]
@@ -673,14 +717,14 @@ class Api(ClientBase):
                         dtime_type = DeliveryTimeType.RESERVE
                 time_group: list = data["time_group"]
                 date = time_group[0]["date"]  # 1673107200000
-                date_start = date + time_group[0]["start_min"] * 60000
-                date_end = date + time_group[0]["end_min"] * 60000
+                date_start = date + time_group[0]["start_min"] * 60_000
+                date_end = date + time_group[0]["end_min"] * 60_000
 
-                cur_date = time() * 1000 + dtime_real*60000
+                cur_date = now + dtime_real * 60_000
                 cur_date = min(max(cur_date, date_start), date_end)
 
-                date_limit = min(max(date + start_hours * 3600000, date_start) +
-                                 dtime_real * 60000, date_end)
+                date_limit = min(max(date + start_hours * 3600_000, date_start) +
+                                 dtime_real * 60_000, date_end)
                 dtime_promise = max(cur_date, date_limit)
                 return ApiResults.DeliveryTime(dtime_type, dtime_promise)
             else:

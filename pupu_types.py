@@ -325,9 +325,13 @@ class ApiResults:
                 return f'{self.func_name} 失败: code={self.code}, msg={self.msg}'
 
     @dataclass
-    class RefreshToken:
+    class TokenRefreshed:
         refresh_token: str
         access_expires: int
+
+    @dataclass
+    class TokenValid:
+        pass
 
     @dataclass
     class SuId:

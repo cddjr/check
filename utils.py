@@ -11,6 +11,8 @@ import traceback
 from functools import wraps
 from typing import Any, BinaryIO
 from fasteners.process_lock import InterProcessReaderWriterLock
+from enum import Enum
+from asyncio import sleep as aio_sleep
 
 
 def pip_install():
@@ -182,12 +184,14 @@ class config_get(object):
         except OSError:
             toml_dict = {}
         if isinstance(value, dict):
-            if not key in toml_dict:
+            if key not in toml_dict:
                 toml_dict[key] = value
             else:
                 toml_dict[key].update(value)
-        else:
+        elif value is not None:
             toml_dict[key] = value
+        elif key in toml_dict:
+            del toml_dict[key]
         try:
             with open(toml_path, "wb") as f:
                 tomli_w.dump(toml_dict, f)
@@ -356,10 +360,16 @@ def randomSleep(min=1, max=6):
     time.sleep(interval)
 
 
-def log(s: str, msg_list=None):
+async def aio_randomSleep(min=1, max=6):
+    interval = random.randint(min, max)
+    print(f"随机等待{interval}秒...")
+    aio_sleep(interval)
+
+
+def log(s: object, msg_list: None | list[str] = None):
     print(s)
     if msg_list is not None:
-        msg_list += [s]
+        msg_list += [str(s)]
 
 
 def GetScriptConfig(filename: str):
@@ -386,6 +396,32 @@ def cookie_to_dic(cookie: str):
     if not cookie:
         return {}
     return {item.split('=')[0]: item.split('=')[1] for item in cookie.split('; ')}
+
+
+class default:
+    """给Enum添加默认值"""
+
+    def __init__(self, **kwargs):
+        if "value" in kwargs:
+            self.__default = kwargs["value"]
+
+    def __call__(self, cls):
+        if issubclass(cls, Enum):
+            @classmethod
+            def missing(cls, value):
+                if hasattr(self, "__default"):
+                    assert value != self.__default
+                    log(f"警告: {cls.__name__} 没有定义 '{value}', 使用默认值'{self.__default}'替代")
+                    return cls(self.__default)
+                else:
+                    for index, member in enumerate(cls):
+                        if index == 0:
+                            log(f"警告: {cls.__name__} 没有定义 '{value}', 使用第{index+1}个枚举值'{member.name}({member.value})'替代")
+                            return member
+                    return None
+
+            cls._missing_ = missing
+        return cls
 
 
 """

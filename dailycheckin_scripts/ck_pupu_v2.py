@@ -119,6 +119,8 @@ class PUPU:
                         self.api.PostPageTaskComplete(info.lottery, task))
                     if isinstance(task_result, ApiResults.Error):
                         log(task_result)
+                    else:
+                        log(f'    {task.task_name}: 已完成')
         # 接着尝试积分兑换
         exchange_count = 0
         while (True):

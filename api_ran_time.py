@@ -3,7 +3,7 @@
 20220822 适配check仓库
 20220916 适配青龙2.13.9+
 :author @night-raise  from github
-cron: 0 0 */7 * *
+cron: 0 0 * * *
 new Env('随机定时');
 """
 

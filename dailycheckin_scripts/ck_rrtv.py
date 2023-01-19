@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 30 10 8,22 * * *
+cron: 10 8,22 * * *
 new Env('多多视频');
 """
 from utils import check, randomSleep, log

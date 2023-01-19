@@ -11,7 +11,7 @@ from time import time, sleep
 from utils import check, log, aio_randomSleep, GetScriptConfig
 from traceback import format_exception
 from pupu_api import Api
-from pupu_api_types import *
+from pupu_types import *
 import asyncio
 import random
 import sys

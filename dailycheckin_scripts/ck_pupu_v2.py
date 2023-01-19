@@ -10,8 +10,8 @@ new Env('朴朴');
 from time import time, sleep
 from utils import check, log, aio_randomSleep, GetScriptConfig
 from traceback import format_exception
-from api_pupu import Api
-from api_pupu_types import *
+from pupu_api import Api
+from pupu_api_types import *
 import asyncio
 import random
 import sys

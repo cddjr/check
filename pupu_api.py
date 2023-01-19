@@ -1,4 +1,4 @@
-from api_pupu_types import *
+from pupu_api_types import *
 from utils import log
 from asyncio import sleep as aio_sleep
 from aiohttp_retry import RetryClient, JitterRetry

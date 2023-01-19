@@ -364,7 +364,7 @@ def randomSleep(min=1, max=6):
 async def aio_randomSleep(min=1, max=6):
     interval = random.randint(min, max)
     print(f"随机等待{interval}秒...")
-    aio_sleep(interval)
+    await aio_sleep(interval)
 
 
 def log(s: object, msg_list: None | list[str] = None):

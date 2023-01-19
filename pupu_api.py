@@ -134,7 +134,8 @@ class ClientBase(object):
                     raise ValueError("server_time 没了")
                 server_time = int(data["server_time"])
                 diff = server_time - int(time() * 1000)
-                log(f"当前与服务器的时间差在{diff}毫秒内")
+                if diff > 1000:
+                    log(f"注意: 本地时间与服务器相差{diff/1000}秒")
                 return diff
             else:
                 return ApiResults.Error(json=obj)
@@ -516,11 +517,12 @@ class Api(ClientBase):
             "action_type": task.action_type,
             "task_id": task.task_id,
             "time_from": time_from,
-            "time_end": time_end, }
+            "time_end": time_end}
         try:
             obj = await self._SendRequest(
                 HttpMethod.kPost,
                 "https://j1.pupuapi.com/client/game/task_system/user_tasks/page_task_complete",
+                json=json,
                 client=ClientType.kWeb)
             if obj["errcode"] == 0:
                 return ApiResults.TaskCompleted()

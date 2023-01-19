@@ -7,7 +7,6 @@ new Env('朴朴');
 找到请求https://cauth.pupuapi.com/clientauth/user/society/wechat/login?user_society_type=11
 在json响应里有refresh_token
 """
-from time import time, sleep
 from utils import check, log, aio_randomSleep, GetScriptConfig
 from traceback import format_exception
 from pupu_api import Api
@@ -210,13 +209,13 @@ class PUPU:
                 log(result, msg)
                 raise self.Leave
             elif isinstance(result, ApiResults.TokenRefreshed):
+                self.nickname = self.api.nickname
                 if result.refresh_token != self.refresh_token:
                     self.refresh_token = result.refresh_token
                     log(f"refresh_token 已更新为: {result.refresh_token}")
                 else:
                     log(f"令牌已更新为: {self.api.access_token}")
 
-            self.nickname = self.api.nickname
             log(f'账号: {self.nickname}', msg)
 
             # 确保收货地址总是最新的

@@ -9,7 +9,7 @@ new Env('朴朴');
 """
 from utils import check, log, aio_randomSleep, GetScriptConfig
 from traceback import format_exception
-from typing import Iterable
+from typing import Iterable, get_args
 from pupu_api import Client as PClient
 from pupu_types import *
 import asyncio
@@ -209,7 +209,7 @@ class PUPU:
                     if id:
                         if isinstance(id, str):
                             lottery_ids.add(id)
-                        elif isinstance(id, Iterable[str]):
+                        elif isinstance(id, Iterable) and get_args(id) == (str):
                             lottery_ids.update(id)
                     if len(lottery_ids) > 0:
                         self.exchange_limit = self.check_item.get(

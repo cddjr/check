@@ -1,5 +1,5 @@
 from pupu_types import *
-from utils import log
+from utils import log, GetScriptConfig
 from asyncio import sleep as aio_sleep, gather as aio_gather
 from aiohttp_retry import RetryClient, JitterRetry
 from random import randint
@@ -8,7 +8,7 @@ from sys import version_info as py_version
 assert py_version >= (3, 10)
 
 
-class ClientBase(object):
+class ApiBase(object):
 
     #__slots__ = ("__session", "__receiver")
 
@@ -175,7 +175,7 @@ class ClientBase(object):
             return await response.json()
 
 
-class Api(ClientBase):
+class Api(ApiBase):
 
     def __init__(self, device_id: str, refresh_token: str,
                  access_token: None | str, expires_in: None | int):
@@ -183,13 +183,17 @@ class Api(ClientBase):
             raise ValueError("参数没有正确设置")
         super().__init__(device_id=device_id)
         self.__refresh_token: None | str = refresh_token
-        self.__nickname: None | str = None
+        self._nickname = self._avatar = None
         self.__expires_in = expires_in or 0
         self.access_token = access_token
 
     @property
-    def nickname(self):
-        return self.__nickname
+    def nickname(self) -> None | str:
+        return self._nickname
+
+    @property
+    def avatar(self) -> None | str:
+        return self._avatar
 
     @property
     def refresh_token(self):
@@ -204,8 +208,8 @@ class Api(ClientBase):
         return self.__expires_in
 
     @expires_in.setter
-    def expires_in(self, v: int):
-        self.__expires_in = v
+    def expires_in(self, v: None | int):
+        self.__expires_in = v or 0
 
     async def RefreshAccessToken(self):
         """刷新AccessToken 有效期通常只有2小时"""
@@ -229,7 +233,7 @@ class Api(ClientBase):
                 self.__refresh_token = data.get(
                     "refresh_token", self.__refresh_token)
                 self.__expires_in = int(data.get('expires_in', 0))
-                self.__nickname = data.get("nick_name")
+                self._nickname = data.get("nick_name")
                 return ApiResults.TokenRefreshed(refresh_token=self.__refresh_token,
                                                  access_expires=self.__expires_in)
             else:
@@ -277,9 +281,9 @@ class Api(ClientBase):
             )
             if obj["errcode"] == 0:
                 data = obj["data"]
-                avatar = data.get("avatar")
-                self.__nickname = data.get("nick_name")
-                return ApiResults.UserInfo(avatar=avatar, nickname=self.__nickname)
+                self._avatar = data.get("avatar")
+                self._nickname = data.get("nick_name")
+                return ApiResults.UserInfo(avatar=self._avatar, nickname=self._nickname)
             else:
                 return ApiResults.Error(json=obj)
         except Exception as e:
@@ -881,6 +885,90 @@ class Api(ClientBase):
                 return ApiResults.Error(json=obj)
         except Exception as e:
             return ApiResults.Error(exception=e)
+
+
+class Client(Api):
+    __slots__ = ("_config",
+                 "_config_dict",
+                 "_saved",
+                 "_refresh_token_user_specified",
+                 )
+
+    def __init__(self, device_id: str, refresh_token: str):
+        super().__init__(device_id, refresh_token, None, None)
+        self._refresh_token_user_specified = refresh_token
+        self._saved = False
+        self._config = GetScriptConfig("pupu")
+        self._config_dict = {}
+        self.LoadConfig()
+
+    def LoadConfig(self, force: bool = False):
+        """加载朴朴配置"""
+        if not self._config:
+            return False
+        if not force and self._config_dict:
+            return True
+        self._config_dict = self._config.get_value_2(self.device_id) or {}
+        refresh_token_prev_spec = self._config_dict.get(
+            "refresh_token_user_specified")
+
+        if not self._refresh_token_user_specified \
+                or self._refresh_token_user_specified != refresh_token_prev_spec:
+            # 说明用户手动修改了token 以用户的为准
+            self.refresh_token = self._refresh_token_user_specified
+        else:
+            self.refresh_token = self._config_dict.get(
+                "refresh_token_lastest", self._refresh_token_user_specified)
+
+        self.access_token = self._config_dict.get("access_token")
+        self.expires_in = self._config_dict.get("access_expires")
+
+        self.user_id = self._config_dict.get("user_id")
+        self.su_id = self._config_dict.get("su_id")
+        self.receiver = PReceiverInfo(
+            self._config_dict.get("recv_id", ""),
+            store_id=self._config_dict.get("store_id", ""),
+            place_id=self._config_dict.get("place_id", ""),
+            city_zip=int(self._config_dict.get("city_zip", 0)),
+            place_zip=int(self._config_dict.get("place_zip", 0)))
+
+        self._nickname = self._config_dict.get("nickname")
+        self._avatar = self._config_dict.get("avatar")
+        return True
+
+    def SaveConfig(self):
+        if not self._config:
+            return False
+        self._config_dict["nickname"] = self.nickname or ""
+        self._config_dict["refresh_token_user_specified"] = self._refresh_token_user_specified or ""
+        self._config_dict["refresh_token_lastest"] = self.refresh_token or ""
+        self._config_dict["access_token"] = self.access_token or ""
+        self._config_dict["access_expires"] = self.expires_in
+        self._config_dict["su_id"] = self.su_id or ""
+        self._config_dict["user_id"] = self.user_id or ""
+        self._config_dict["recv_id"] = self.receiver.id if self.receiver else ""
+        self._config_dict["store_id"] = self.receiver.store_id if self.receiver else ""
+        self._config_dict["place_id"] = self.receiver.place_id if self.receiver else ""
+        self._config_dict["city_zip"] = self.receiver.city_zip if self.receiver else 0
+        self._config_dict["place_zip"] = self.receiver.place_zip if self.receiver else 0
+        self._config_dict["avatar"] = self.avatar or ""
+        self._config.set_value(self.device_id, self._config_dict)
+        self._saved = True
+        return True
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, type, value, trace):
+        self.SaveConfig()
+        await self.Release()
+
+    def __del__(self):
+        if getattr(self, "_saved", None) is None:
+            # __init__ 出错了
+            return
+        if not self._saved:
+            log("警告: 没有执行 SaveConfig")
 
 
 if __name__ == "__main__":

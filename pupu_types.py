@@ -339,8 +339,8 @@ class ApiResults:
 
     @dataclass
     class UserInfo:
-        avatar: str
-        nickname: str
+        avatar: None | str
+        nickname: None | str
 
     @dataclass
     class ReceiverInfo:

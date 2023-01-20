@@ -190,6 +190,8 @@ class ERROR_CODE(IntEnum):
     EXPIRED_TOKEN = 200304
 
     kRepeatedSignIn = 350011
+    kUnknown = -1 # 系统繁忙
+    kUnk_400k = 400000 # 系统繁忙
 
     ERROR_TASK_NOT_GENERATED = 400104
     ERROR_TASK_DOES_NOT_EXIST = 400106

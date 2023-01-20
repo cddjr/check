@@ -7,9 +7,9 @@ new Env('朴朴');
 找到请求https://cauth.pupuapi.com/clientauth/user/society/wechat/login?user_society_type=11
 在json响应里有refresh_token
 """
-from utils import check, log, aio_randomSleep, GetScriptConfig
+from utils import check, log, aio_randomSleep
 from traceback import format_exception
-from typing import Iterable, get_args
+from typing import Iterable
 from pupu_api import Client as PClient
 from pupu_types import *
 import asyncio
@@ -57,12 +57,36 @@ class PUPU:
                         log(task_result)
                     else:
                         log(f'    {task.task_name}: 已完成')
+        async def __draw():
+            """抽奖"""
+            chances_info = await api.GetUserLotteryInfo(info.lottery)
+            if isinstance(chances_info, ApiResults.Error):
+                log(chances_info, msg)
+                return False
+            elif chances_info.remain_chances <= 0:
+                log(' 没有抽奖机会', msg)
+                return False
+
+            log(f' 当前有{chances_info.remain_chances}次抽奖机会', msg)
+            for i in range(chances_info.remain_chances):
+                # 每次抽奖至少间隔2~5秒的时间
+                _, lottery_result = await asyncio.gather(
+                    aio_randomSleep(2, 5),
+                    api.Lottery(info.lottery))
+                if isinstance(lottery_result, ApiResults.Error):
+                    log(f'  第{i+1}次抽奖: {lottery_result}', msg)
+                else:
+                    log(f'  第{i+1}次抽奖: {lottery_result.prize.name}', msg)
+            return True
         # 接着尝试积分兑换
         exchange_count = 0
         while (True):
             if isinstance(chance_info, ApiResults.Error):
-                # 拉取失败了 直接退出兑换循环
-                log(chance_info, msg)
+                # 拉取失败了
+                if chance_info.code != ERROR_CODE.kUnk_400k:
+                    log(chance_info, msg)
+                # 直接尝试抽奖
+                __draw()
                 break
             for entrance in chance_info.entrances:
                 if entrance.type == CHANCE_OBTAIN_TYPE.COIN_EXCHANGE:
@@ -93,27 +117,11 @@ class PUPU:
                 if exchange_count > 0:
                     # 成功兑换了积分后需要等待2秒确保抽奖机会数更新
                     await asyncio.sleep(2)
-            # 接着获取有多少次抽奖机会
-            chances_info = await api.GetUserLotteryInfo(info.lottery)
-            if isinstance(chances_info, ApiResults.Error):
-                log(chances_info, msg)
+            # 开始抽奖
+            if not __draw():
                 break
-            if chances_info.remain_chances > 0:
-                log(f' 当前有{chances_info.remain_chances}次抽奖机会', msg)
-                for i in range(chances_info.remain_chances):
-                    # 每次抽奖至少间隔1~5秒的时间
-                    _, lottery_result = await asyncio.gather(
-                        aio_randomSleep(1, 5),
-                        api.Lottery(info.lottery))
-                    if isinstance(lottery_result, ApiResults.Error):
-                        log(f'  第{i+1}次抽奖: {lottery_result}', msg)
-                    else:
-                        log(f'  第{i+1}次抽奖: {lottery_result.prize.name}', msg)
-                # 稍等片刻确保积分余额更新
-                await asyncio.sleep(2)
-            else:
-                log(' 没有抽奖机会', msg)
-                break
+            # 稍等片刻确保积分余额更新
+            await asyncio.sleep(2)
             # 获取积分余额
             chance_info = await api.GetChanceEntrances(info.lottery)
         return msg
@@ -209,7 +217,7 @@ class PUPU:
                     if id:
                         if isinstance(id, str):
                             lottery_ids.add(id)
-                        elif isinstance(id, Iterable) and get_args(id) == (str):
+                        elif isinstance(id, Iterable):
                             lottery_ids.update(id)
                     if len(lottery_ids) > 0:
                         self.exchange_limit = self.check_item.get(

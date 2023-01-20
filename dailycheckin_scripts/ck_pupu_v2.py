@@ -149,8 +149,7 @@ class PUPU:
                     log(result, msg)
                     raise self.Leave
                 elif isinstance(result, ApiResults.TokenRefreshed):
-                    if result.refresh_token != self.refresh_token:
-                        self.refresh_token = result.refresh_token
+                    if result.refresh_token != refresh_token:
                         log(f"refresh_token 已更新为: {result.refresh_token}")
                     else:
                         log(f"令牌已更新为: {api.access_token}")

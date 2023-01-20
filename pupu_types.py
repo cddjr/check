@@ -155,6 +155,14 @@ class SPREAD_TAG(IntEnum):
 
 
 @default()
+class PURCHASE_TYPE(IntEnum):
+    kUnknown = -0xdeadbeef
+    ALL = -1  # 不限
+    GENERAL = 0  # 普通
+    RESERVE = 10  # 预定
+
+
+@default()
 class SHARE_STATUS(IntEnum):
     kUnknown = -0xdeadbeef
     UNKNOWN = 0
@@ -190,8 +198,8 @@ class ERROR_CODE(IntEnum):
     EXPIRED_TOKEN = 200304
 
     kRepeatedSignIn = 350011
-    kUnknown = -1 # 系统繁忙
-    kUnk_400k = 400000 # 系统繁忙
+    kUnknown = -1  # 系统繁忙
+    kUnk_400k = 400000  # 系统繁忙
 
     ERROR_TASK_NOT_GENERATED = 400104
     ERROR_TASK_DOES_NOT_EXIST = 400106
@@ -262,16 +270,35 @@ class PChanceEntrance:
 
 
 @dataclass
-class PProduct:
-    # 价格 分
-    price: int
-    product_id: str
+class PBatch:
+    batch_id: str
+    price: int  # 价格 分
+    spread_tag_desc: str
+
+
+@dataclass
+class FlashSaleInfo:
     store_product_id: str
-    remark: str  # 商品备注
+    event_id: str
+    quantity_each_person_limit: int
+    progress_rate: float
+    price: int
+
+
+@dataclass
+class PProduct:
+    price: int  # 价格 分
+    product_id: str
+    name: str
+    store_product_id: str
+    order_remarks: list[str]
     spread_tag: SPREAD_TAG
     stock_quantity: int  # 库存
+    purchase_type: PURCHASE_TYPE = PURCHASE_TYPE.GENERAL
     quantity_limit: None | int = None  # 限购数量
     selected_count: int = 0  # 选购几件
+    sell_batches: None | list[PBatch] = None  # 该数组的最低价作为当前价格
+    remark: None | str = None  # 商品备注
 
 
 @dataclass
@@ -398,6 +425,7 @@ class ApiResults:
     @dataclass
     class UsableCoupons:
         coupons: list[str]
+        rules: list[PDiscountRule]
 
     @dataclass
     class DeliveryTime:

@@ -118,6 +118,12 @@ class ApiBase(object):
                 self.__server_date_diff = result
         return int(time()*1000 + self.__server_date_diff)
 
+    def TryGetServerTime(self):
+        """类似GetServerTime"""
+        if self.__server_date_diff is not None:
+            return int(time()*1000 + self.__server_date_diff)
+        return None
+
     async def ComputeServerTimeDiff(self):
         """计算本地时间与服务器时间的时间差"""
         try:
@@ -621,17 +627,20 @@ class Api(ApiBase):
                 # 总共收藏了{total_count}件商品
                 total_count: int = data.get("count", 0)
                 for p in data.get("products", []):
-                    order_remarks = p.get("order_remarks", [])
+                    # TODO 若 p["sell_batches"] 不为空，则以该数组的最低价作为当前价格
                     product = PProduct(
+                        name=p["name"],
                         price=p["price"],
                         product_id=p["product_id"],
                         store_product_id=p["id"],
-                        spread_tag=p.get(
-                            "spread_tag", SPREAD_TAG.NORMAL_PRODUCT),
+                        purchase_type=PURCHASE_TYPE(
+                            p.get("purchase_type", PURCHASE_TYPE.GENERAL)),
+                        spread_tag=SPREAD_TAG(
+                            p.get("spread_tag", SPREAD_TAG.NORMAL_PRODUCT)),
                         stock_quantity=p.get("stock_quantity", 0),
-                        remark=order_remarks[0] if order_remarks else ""
+                        order_remarks=p.get("order_remarks", [])
                     )
-                    if p.get("spread_tag") == SPREAD_TAG.FLASH_SALE_PRODUCT:
+                    if product.spread_tag == SPREAD_TAG.FLASH_SALE_PRODUCT:
                         flash_sale_info = p.get("flash_sale_info", {})
                         progress_rate: float = flash_sale_info.get(
                             "progress_rate", 0.0)
@@ -682,13 +691,23 @@ class Api(ApiBase):
             )
             if obj["errcode"] == 0:
                 ids = []
+                rules = []
                 data = obj["data"]
                 if data.get("count", 0) > 0:
                     best_discount = data.get("best_discount", {})
                     id = best_discount.get("id")
+                    rule = best_discount.get("rule", {})
                     if id:
+                        # 超时赔付券，券前金额满8减8元；
+                        # content:None|str = rule.get("content")
                         ids.append(id)
-                return ApiResults.UsableCoupons(ids)
+                        rules.append(PDiscountRule(
+                            id=rule.get("discount_id", ""),
+                            type=DiscountType(rule.get("discount_type",
+                                                       DiscountType.ABSOLUTE)),
+                            condition_amount=rule.get("condition_amount", 0),
+                            discount_amount=rule.get("discount_amount", 0)))
+                return ApiResults.UsableCoupons(coupons=ids, rules=rules)
             else:
                 return ApiResults.Error(json=obj)
         except Exception as e:
@@ -707,6 +726,7 @@ class Api(ApiBase):
                     "is_gift": False,
                     "count": pi.selected_count,
                 }
+                json.append(obj)
             co_req = self._SendRequest(
                 HttpMethod.kPost,
                 "https://j1.pupuapi.com/client/deliverytime/v4",
@@ -741,7 +761,7 @@ class Api(ApiBase):
         except Exception as e:
             return ApiResults.Error(exception=e)
 
-    async def CreateOrder(self, pay_type: int, coupons: list[str], products: list[PProduct],
+    async def CreateOrder(self, pay_type: int, coupons: None | list[str], products: list[PProduct],
                           dtime_type: DeliveryTimeType, dtime_promise: int):
         """创建订单"""
         assert self.receiver
@@ -765,7 +785,7 @@ class Api(ApiBase):
             "delivery_time_type": dtime_type,
             "device_id": self.device_id,
             "device_os": "20",
-            "discount_entity_ids": coupons,
+            "discount_entity_ids": coupons or [],
             "external_payment_amount": 0,  # 总金额(分) 无所谓
             "lat_y": self.receiver.lat_y,
             "lng_x": self.receiver.lng_x,
@@ -774,7 +794,7 @@ class Api(ApiBase):
             "order_items": order_items,
             "order_type": 0,
             "pay_type": pay_type,  # 15是云闪付
-            "place_id": self.place_id,
+            "place_id": self.receiver.place_id,
             "print_order_product_ticket_info": False,  # 是否打印商品详情(所谓环保)
             "put_if_no_answer": False,  # 联系不上是否放门口
             "receiver": {

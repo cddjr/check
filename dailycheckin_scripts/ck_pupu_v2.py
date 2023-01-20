@@ -57,6 +57,7 @@ class PUPU:
                         log(task_result)
                     else:
                         log(f'    {task.task_name}: 已完成')
+
         async def __draw():
             """抽奖"""
             chances_info = await api.GetUserLotteryInfo(info.lottery)
@@ -78,6 +79,7 @@ class PUPU:
                 else:
                     log(f'  第{i+1}次抽奖: {lottery_result.prize.name}', msg)
             return True
+
         # 接着尝试积分兑换
         exchange_count = 0
         while (True):
@@ -86,7 +88,7 @@ class PUPU:
                 if chance_info.code != ERROR_CODE.kUnk_400k:
                     log(chance_info, msg)
                 # 直接尝试抽奖
-                __draw()
+                await __draw()
                 break
             for entrance in chance_info.entrances:
                 if entrance.type == CHANCE_OBTAIN_TYPE.COIN_EXCHANGE:
@@ -118,7 +120,7 @@ class PUPU:
                     # 成功兑换了积分后需要等待2秒确保抽奖机会数更新
                     await asyncio.sleep(2)
             # 开始抽奖
-            if not __draw():
+            if not await __draw():
                 break
             # 稍等片刻确保积分余额更新
             await asyncio.sleep(2)

@@ -14,7 +14,7 @@ class ApiBase(object):
 
     def __init__(self, device_id: str):
         assert device_id
-        self.__device_id = device_id
+        self.__device_id = device_id.upper()
         self.__su_id = self.__access_token = self.__user_id = None
         self.__receiver = None
         self.__server_date_diff = None
@@ -213,7 +213,10 @@ class Api(ApiBase):
 
     async def RefreshAccessToken(self):
         """刷新AccessToken 有效期通常只有2小时"""
-        current_time = await self.GetServerTime()
+        initial_tasks = [self.GetServerTime()]
+        if not self.su_id:
+            initial_tasks.append(self.GetSuID())
+        current_time = (await aio_gather(*initial_tasks))[0]
         if self.access_token and current_time + 360_000 < self.expires_in:
             # access_token 有效
             return ApiResults.TokenValid()
@@ -318,7 +321,7 @@ class Api(ApiBase):
                             place_id=place["id"],
                             city_zip=place.get("store_city_zip", 0)
                         )
-                        # self.user_id = r.get("user_id", self.user_id)
+                        self.user_id = r.get("user_id", self.user_id)
                         info.place_zip = int(place.get("zip", info.city_zip))
 
                         building_name = None
@@ -963,10 +966,7 @@ class Client(Api):
         if isinstance(token_result, ApiResults.Error):
             return token_result
 
-        initial_tasks = [self.GetReceiver(filter=address_filter)]
-        if not self.su_id:
-            initial_tasks.append(self.GetSuID())
-        recv_result = (await aio_gather(*initial_tasks))[0]
+        recv_result = await self.GetReceiver(filter=address_filter)
         if isinstance(recv_result, ApiResults.Error):
             return recv_result
         return token_result

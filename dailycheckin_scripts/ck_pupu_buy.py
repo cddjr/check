@@ -177,21 +177,15 @@ class PUPU:
         return msg
 
     def ParseGoods(self):
-        """
-        解析商品配置 {name, 价格(元)}
-        """
+        """解析商品配置"""
         goods_list: list[Goods] = []
         for goods in self.check_item.get("goods", []):
             if not isinstance(goods, dict):
                 continue
             keyword = goods.get("keyword")
-            if keyword is None:
-                continue
             if not isinstance(keyword, str):
                 continue
             price = goods.get("price")
-            if price is None:
-                continue
             if not isinstance(price, int | float):
                 continue
             goods_list.append(Goods(
@@ -202,9 +196,7 @@ class PUPU:
         return goods_list
 
     async def ServerJ(self, title: str, content: str):
-        """
-        通过 ServerJ 推送消息。
-        """
+        """通过 ServerJ 推送消息"""
         if not self._push_key:
             return []
         msg: list[str] = []

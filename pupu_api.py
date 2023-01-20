@@ -900,7 +900,6 @@ class Client(Api):
         self._saved = False
         self._config = GetScriptConfig("pupu")
         self._config_dict = {}
-        self.LoadConfig()
 
     def LoadConfig(self, force: bool = False):
         """加载朴朴配置"""
@@ -955,6 +954,22 @@ class Client(Api):
         self._config.set_value(self.device_id, self._config_dict)
         self._saved = True
         return True
+
+    async def InitializeToken(self, address_filter: None | str):
+        """初始化"""
+        self.LoadConfig(force=True)
+
+        token_result = await self.RefreshAccessToken()
+        if isinstance(token_result, ApiResults.Error):
+            return token_result
+
+        initial_tasks = [self.GetReceiver(filter=address_filter)]
+        if not self.su_id:
+            initial_tasks.append(self.GetSuID())
+        recv_result = (await aio_gather(*initial_tasks))[0]
+        if isinstance(recv_result, ApiResults.Error):
+            return recv_result
+        return token_result
 
     async def __aenter__(self):
         return self

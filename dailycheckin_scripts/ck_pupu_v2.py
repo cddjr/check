@@ -34,7 +34,7 @@ class PUPU:
             log(info, msg)
             return msg
         elif info.lottery.type != LOTTERY_TYPE.DRAW:
-            log(f'活动类型不支持: {info.lottery.type}', msg)
+            log(f'[{info.lottery.name}] 不支持: {info.lottery.type}', msg)
             return msg
         log(f'正在进行 [{info.lottery.name}]', msg)
         # 同时拉取任务列表和抽奖机会兑换列表
@@ -143,18 +143,15 @@ class PUPU:
                 self.buy = False
 
             device_id = self.check_item.get("device_id", "").upper()
+            refresh_token = self.check_item.get("refresh_token")
+            self.PUSH_KEY = self.check_item.get("PUSH_KEY")
             if not device_id:
                 raise SystemExit("device_id 配置有误")
-
-            refresh_token = self.check_item.get("refresh_token")
             if not refresh_token:
                 raise SystemExit("refresh_token 配置有误")
 
-            self.PUSH_KEY = self.check_item.get("PUSH_KEY")
-            self.addr_filter = self.check_item.get("addr_filter")
-
             async with PClient(device_id, refresh_token) as api:
-                result = await api.RefreshAccessToken()
+                result = await api.InitializeToken(self.check_item.get("addr_filter"))
                 if isinstance(result, ApiResults.Error):
                     log(result, msg)
                     raise self.Leave
@@ -165,18 +162,8 @@ class PUPU:
                         log(f"令牌已更新为: {api.access_token}")
 
                 log(f'账号: {api.nickname}', msg)
-
-                # 确保收货地址总是最新的
-                initial_tasks = [api.GetReceiver(filter=self.addr_filter)]
-                if not api.su_id:
-                    initial_tasks.append(api.GetSuID())
-                result = (await asyncio.gather(*initial_tasks))[0]
-                if isinstance(result, ApiResults.Error):
-                    log(result, msg)
-                    raise self.Leave
-                assert isinstance(result, ApiResults.ReceiverInfo)
-                log(f'收货地址: {result.receiver.address} {result.receiver.room_num}')
-                log(f'仓库ID: {result.receiver.store_id}')
+                log(f'收货地址: {api.receiver.address} {api.receiver.room_num}')
+                log(f'仓库ID: {api.receiver.store_id}')
 
                 if self.watch or self.buy:
                     # TODO 价格监控

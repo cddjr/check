@@ -96,9 +96,10 @@ class PUPU:
         if isinstance(info, ApiResults.Error):
             log(info, msg)
             return msg
-        elif info.lottery.type != LOTTERY_TYPE.DRAW:
-            log(f'[{info.lottery.name}] 不支持: {info.lottery.type}', msg)
-            return msg
+        # 似乎朴朴压根不关心你点的哪张牌
+        # elif info.lottery.type != LOTTERY_TYPE.DRAW:
+        #    log(f'[{info.lottery.name}] 不支持: {info.lottery.type}', msg)
+        #    return msg
         log(f'正在进行 [{info.lottery.name}]', msg)
         # 同时拉取任务列表和抽奖机会兑换列表
         task_groups, chance_info = await asyncio.gather(

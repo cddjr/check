@@ -1,14 +1,16 @@
 from dataclasses import dataclass, field
-from enum import IntEnum, Enum
-from utils import default
-from traceback import format_exception
-from sys import _getframe as getframe, version_info as py_version
-assert py_version >= (3, 10)
+from enum import Enum, IntEnum
+from sys import _getframe as getframe
+from sys import version_info as py_version
+from traceback import format_exc
+from typing import Optional  # 确保兼容<=Python3.9
+
+from utils import MyIntEnum
+
+assert py_version >= (3, 9)
 
 
-@default()
-class BANNER_LINK_TYPE(IntEnum):
-    kUnknown = -0xdeadbeef
+class BANNER_LINK_TYPE(MyIntEnum):
     RECOMMEND = -10
     PRODUCT_DETAIL_ACTIVITY = 0
     TOPIC_ACTIVITY = 10
@@ -49,9 +51,7 @@ class BANNER_LINK_TYPE(IntEnum):
     WEB = 99999
 
 
-@default()
-class DiscountType(IntEnum):
-    kUnknown = -0xdeadbeef
+class DiscountType(MyIntEnum):
     ALL = -1  # 全部
     ABSOLUTE = 0  # 满减
     PERCENTAGE = 10  # 百分比折扣
@@ -61,9 +61,7 @@ class DiscountType(IntEnum):
     TRADE_BUY = 50  # 换购
 
 
-@default()
-class DeliveryReasonType(IntEnum):
-    kUnknown = -0xdeadbeef
+class DeliveryReasonType(MyIntEnum):
     WEATHER = 0
     PEAK = 1  # 因配送高峰, 配送时间有调整, 请耐心等待
     OTHER = 2
@@ -75,24 +73,18 @@ class DeliveryReasonType(IntEnum):
     LONG_DISTANCE = 300
 
 
-@default()
-class DeliveryTimeType(IntEnum):
-    kUnknown = -0xdeadbeef
+class DeliveryTimeType(MyIntEnum):
     IMMEDIATE = 0
     RESERVE = 10
 
 
-@default()
-class LOTTERY_TYPE(IntEnum):
-    kUnknown = -0xdeadbeef
+class LOTTERY_TYPE(MyIntEnum):
     SLOT = 10
     FLOP = 20
     DRAW = 30
 
 
-@default()
-class CHANCE_OBTAIN_TYPE(IntEnum):
-    kUnknown = -0xdeadbeef
+class CHANCE_OBTAIN_TYPE(MyIntEnum):
     RECEIVE_ORGER = 10
     INVITE_NEW_USER = 20
     COIN_EXCHANGE = 30  # 积分兑换
@@ -101,25 +93,19 @@ class CHANCE_OBTAIN_TYPE(IntEnum):
     GO_TO_BOOST = 70
 
 
-@default()
-class RewardType(IntEnum):
-    kUnknown = -0xdeadbeef
+class RewardType(MyIntEnum):
     Coupon = 10
     PuPoint = 20
     GiftCard = 30
     Sunrise = 40
 
 
-@default()
-class ActionTYPE(IntEnum):
-    kUnknown = -0xdeadbeef
+class ActionTYPE(MyIntEnum):
     BROWSE = 0
     SHARE = 10
 
 
-@default()
-class TaskType(IntEnum):
-    kUnknown = -0xdeadbeef
+class TaskType(MyIntEnum):
     FLASH_SALE = 240
     CUSTOM_LOTTERY = 250
     TOPIC = 260
@@ -127,18 +113,14 @@ class TaskType(IntEnum):
     SCENE = 280
 
 
-@default()
-class TaskStatus(IntEnum):
-    kUnknown = -0xdeadbeef
+class TaskStatus(MyIntEnum):
     Undone = 0
     Done = 10
     Expired = 20
     Receive = 30
 
 
-@default()
-class SPREAD_TAG(IntEnum):
-    kUnknown = -0xdeadbeef
+class SPREAD_TAG(MyIntEnum):
     UNKNOWN = -1  # 不限
     NORMAL_PRODUCT = 0
     NEW_PRODUCT = 10  # 新品
@@ -154,17 +136,13 @@ class SPREAD_TAG(IntEnum):
     THREE_ORDER_EXCLUSIVE = 140
 
 
-@default()
-class PURCHASE_TYPE(IntEnum):
-    kUnknown = -0xdeadbeef
+class PURCHASE_TYPE(MyIntEnum):
     ALL = -1  # 不限
     GENERAL = 0  # 普通
     RESERVE = 10  # 预定
 
 
-@default()
-class SHARE_STATUS(IntEnum):
-    kUnknown = -0xdeadbeef
+class SHARE_STATUS(MyIntEnum):
     UNKNOWN = 0
     ERROR = 1
     EXPIRED = 2
@@ -172,7 +150,7 @@ class SHARE_STATUS(IntEnum):
     NORMAL = 4
 
 
-class ERROR_CODE(IntEnum):
+class ERROR_CODE(MyIntEnum):
     CODE_SUCCESS = 0
 
     # COMMENT_ERROR_CODE
@@ -212,8 +190,8 @@ class PReceiverInfo:
     id: str
     address: str = ""
     room_num: str = ""
-    lng_x: None | float = 0
-    lat_y: None | float = 0
+    lng_x: Optional[float] = 0
+    lat_y: Optional[float] = 0
     receiver_name: str = ""
     phone_number: str = ""
     store_id: str = ""
@@ -256,7 +234,7 @@ class PLotteryInfo:
     name: str
     type: LOTTERY_TYPE
     prizes: dict[int, PPrize] = field(default_factory=dict)
-    task_system_link_id: None | str = None
+    task_system_link_id: Optional[str] = None
 
 
 @dataclass
@@ -295,10 +273,10 @@ class PProduct:
     spread_tag: SPREAD_TAG
     stock_quantity: int  # 库存
     purchase_type: PURCHASE_TYPE = PURCHASE_TYPE.GENERAL
-    quantity_limit: None | int = None  # 限购数量
+    quantity_limit: Optional[int] = None  # 限购数量
     selected_count: int = 0  # 选购几件
-    sell_batches: None | list[PBatch] = None  # 该数组的最低价作为当前价格
-    remark: None | str = None  # 商品备注
+    sell_batches: Optional[list[PBatch]] = None  # 该数组的最低价作为当前价格
+    remark: Optional[str] = None  # 商品备注
 
 
 @dataclass
@@ -321,7 +299,7 @@ class POrder:
     total_price: int
     time_create: int  # 1673265913282
     # TODO items
-    discount_share: None | PDiscountShare = None  # 红包
+    discount_share: Optional[PDiscountShare] = None  # 红包
 
 
 @dataclass
@@ -332,26 +310,35 @@ class PBanner:
 
 class ApiResults:
     class Error:
+
+        __slots__ = ("code", "msg", "func_name")
+
         def __init__(self,
-                     func_name: str | None = None,
-                     json: None | dict = None,
-                     exception: None | Exception = None):
+                     json: Optional[dict],
+                     func_name: Optional[str] = None):
             if json:
                 self.code = json.get("errcode")
                 self.msg = json.get("errmsg", "")
-                self.exception = None
-            elif exception:
-                self.code = self.msg = None
-                self.exception = exception
             else:
-                raise ValueError("参数无效")
+                self.code = -1
+                self.msg = ""
+
             self.func_name = func_name or getframe(1).f_code.co_name
 
         def __str__(self) -> str:
-            if self.exception:
-                return f'{self.func_name} 异常: {"".join(format_exception(self.exception))}'
-            else:
-                return f'{self.func_name} 失败: code={self.code}, msg={self.msg}'
+            return f'{self.func_name} 失败: code={self.code}, msg={self.msg}'
+
+    class Exception(Error):
+        __slots__ = ("exception")
+
+        def __init__(self,
+                     func_name: Optional[str] = None):
+            super().__init__(json=None,
+                             func_name=func_name or getframe(1).f_code.co_name)
+            self.exception = format_exc()
+
+        def __str__(self) -> str:
+            return f'{self.func_name} 异常: {self.exception}'
 
     @dataclass
     class TokenRefreshed:
@@ -368,8 +355,8 @@ class ApiResults:
 
     @dataclass
     class UserInfo:
-        avatar: None | str
-        nickname: None | str
+        avatar: Optional[str]
+        nickname: Optional[str]
 
     @dataclass
     class ReceiverInfo:
@@ -446,7 +433,7 @@ class ApiResults:
         best_luck: bool
         reentry: bool
         user_count: int
-        discount: None | PDiscountRule
+        discount: Optional[PDiscountRule]
         available: bool
 
 

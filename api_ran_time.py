@@ -137,7 +137,7 @@ class QLClient(ClientApi):
 def main(*args, **kwargs):
     msg = []
     try:
-        QLClient(client_info=kwargs.get("value")).run()
+        QLClient(client_info=kwargs.get("value", {})).run()
         log("处于启动状态的任务定时修改成功！", msg)
     except ValueError as e:
         log(f"配置错误，{e},请检查你的配置文件！", msg)

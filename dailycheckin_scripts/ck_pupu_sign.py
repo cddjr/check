@@ -7,13 +7,15 @@ new Env('朴朴签到');
 找到请求https://cauth.pupuapi.com/clientauth/user/society/wechat/login?user_society_type=11
 在json响应里有refresh_token
 """
-from utils import check, log
-from traceback import format_exception
-from pupu_api import Client as PClient
-from pupu_types import *
 import asyncio
 import sys
-assert sys.version_info >= (3, 10)
+from traceback import format_exc
+
+from pupu_api import Client as PClient
+from pupu_types import *
+from utils import check, log
+
+assert sys.version_info >= (3, 9)
 
 
 class PUPU:
@@ -30,15 +32,15 @@ class PUPU:
         msg: list[str] = []
         try:
             self.device_id = self.check_item.get("device_id", "")
-            self.refresh_token = self.check_item.get("refresh_token")
+            self.refresh_token = self.check_item.get("refresh_token", "")
             if not self.device_id:
                 raise SystemExit("device_id 配置有误")
             if not self.refresh_token:
                 raise SystemExit("refresh_token 配置有误")
 
             msg += await self.sign()
-        except Exception as e:
-            log(f'失败: 请检查接口 {"".join(format_exception(e))}', msg)
+        except Exception:
+            log(f'失败: 请检查接口 {format_exc()}', msg)
         return "\n".join(msg)
 
     async def sign(self):

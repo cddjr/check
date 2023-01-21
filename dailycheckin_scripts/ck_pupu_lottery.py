@@ -11,14 +11,16 @@ lottery_id 手动配置抽奖id 支持字符串数组或单个字符串
 find_lottery 是否自动获取抽奖活动, 默认自动(部分藏的很深的抽奖暂时需要手动配置id)
 coin_exchange 每个抽奖活动可兑换多少次朴分, 默认0次不兑换
 """
-from utils import check, log, aio_randomSleep
-from traceback import format_exception
-from typing import Iterable
-from pupu_api import Client as PClient
-from pupu_types import *
 import asyncio
 import sys
-assert sys.version_info >= (3, 10)
+from traceback import format_exc
+from typing import Iterable
+
+from pupu_api import Client as PClient
+from pupu_types import *
+from utils import aio_randomSleep, check, log
+
+assert sys.version_info >= (3, 9)
 
 
 class PUPU:
@@ -36,15 +38,15 @@ class PUPU:
         msg: list[str] = []
         try:
             self.device_id = self.check_item.get("device_id", "")
-            self.refresh_token = self.check_item.get("refresh_token")
+            self.refresh_token = self.check_item.get("refresh_token", "")
             if not self.device_id:
                 raise SystemExit("device_id 配置有误")
             if not self.refresh_token:
                 raise SystemExit("refresh_token 配置有误")
 
             msg += await self.Lottery()
-        except Exception as e:
-            log(f'失败: 请检查接口 {"".join(format_exception(e))}', msg)
+        except Exception:
+            log(f'失败: 请检查接口 {format_exc()}', msg)
         return "\n".join(msg)
 
     async def Lottery(self):

@@ -15,14 +15,18 @@ buy 如果降价是否抢购 默认False只发送降价通知
 addr_filter 限定用哪个收货地址(可选) 默认用最近下单地址
 push_key 降价时用的ServerJ推送key(可选)
 """
-from utils import check, log, aio_randomSleep
-from traceback import format_exception
-from aiohttp import ClientSession, ClientTimeout
-from pupu_api import Client as PClient
-from pupu_types import *
 import asyncio
 import sys
-assert sys.version_info >= (3, 10)
+from traceback import format_exc
+from typing import Optional  # 确保兼容<=Python3.9
+
+from aiohttp import ClientSession, ClientTimeout
+
+from pupu_api import Client as PClient
+from pupu_types import *
+from utils import check, log
+
+assert sys.version_info >= (3, 9)
 
 
 @dataclass
@@ -49,9 +53,9 @@ class PUPU:
         msg: list[str] = []
         try:
             self._buy = bool(self.check_item.get("buy", False))
-            self._push_key: None | str = self.check_item.get("push_key")
+            self._push_key: Optional[str] = self.check_item.get("push_key")
             self.device_id = self.check_item.get("device_id", "")
-            self.refresh_token = self.check_item.get("refresh_token")
+            self.refresh_token = self.check_item.get("refresh_token", "")
             if not self.device_id:
                 raise SystemExit("device_id 配置有误")
             if not self.refresh_token:
@@ -64,8 +68,8 @@ class PUPU:
                 raise SystemExit("没有配置需要检测的商品 跳过")
 
             msg += await self.Entry()
-        except Exception as e:
-            log(f'失败: 请检查接口 {"".join(format_exception(e))}', msg)
+        except Exception:
+            log(f'失败: 请检查接口 {format_exc()}', msg)
         return "\n".join(msg)
 
     async def DetectProducts(self, api: PClient):
@@ -186,7 +190,7 @@ class PUPU:
             if not isinstance(keyword, str):
                 continue
             price = goods.get("price")
-            if not isinstance(price, int | float):
+            if not isinstance(price, (int, float)):
                 continue
             goods_list.append(Goods(
                 keyword,

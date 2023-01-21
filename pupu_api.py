@@ -1,16 +1,21 @@
-from pupu_types import *
-from utils import log, GetScriptConfig
-from asyncio import sleep as aio_sleep, gather as aio_gather
-from aiohttp_retry import RetryClient, JitterRetry
+from asyncio import gather as aio_gather
+from asyncio import sleep as aio_sleep
 from random import randint
-from time import time
 from sys import version_info as py_version
-assert py_version >= (3, 10)
+from time import time
+from typing import Any, Optional, Union  # 确保兼容<=Python3.9
+
+from aiohttp_retry import JitterRetry, RetryClient
+
+from pupu_types import *
+from utils import GetScriptConfig, log
+
+assert py_version >= (3, 9)
 
 
 class ApiBase(object):
 
-    #__slots__ = ("__session", "__receiver")
+    # __slots__ = ("__session", "__receiver")
 
     def __init__(self, device_id: str):
         assert device_id
@@ -55,7 +60,7 @@ class ApiBase(object):
         return self.__access_token
 
     @access_token.setter
-    def access_token(self, token: None | str):
+    def access_token(self, token: Optional[str]):
         self.__access_token = token
         if token:
             self.__session._client.headers["Authorization"] = f"Bearer {token}"
@@ -71,7 +76,7 @@ class ApiBase(object):
         return self.__su_id
 
     @su_id.setter
-    def su_id(self, id: None | str):
+    def su_id(self, id: Optional[str]):
         self.__su_id = id
         if id:
             self.__session._client.headers["pp-suid"] = id
@@ -83,7 +88,7 @@ class ApiBase(object):
         return self.__user_id
 
     @user_id.setter
-    def user_id(self, id: None | str):
+    def user_id(self, id: Optional[str]):
         self.__user_id = id
         if id:
             self.__session._client.headers["pp-userid"] = id
@@ -95,7 +100,7 @@ class ApiBase(object):
         return self.__receiver
 
     @receiver.setter
-    def receiver(self, receiver: None | PReceiverInfo):
+    def receiver(self, receiver: Optional[PReceiverInfo]):
         self.__receiver = receiver
         if receiver and receiver.place_id:
             self.__session._client.headers["pp-placeid"] = receiver.place_id
@@ -145,28 +150,27 @@ class ApiBase(object):
                 return diff
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def _SendRequest(self, method: HttpMethod, url: str,
                            client=ClientType.kNative,
-                           headers: None | dict = None,
-                           params: None | dict = None, data=None, json=None):
+                           headers: Optional[dict] = None,
+                           params: Optional[dict] = None, data=None, json=None):
         """发起一个HTTP请求"""
         req_headers = {}
-        match client:
-            case ClientType.kNative:
-                req_headers["User-Agent"] = self.native_user_agent
-                req_headers["pp-os"] = "20"  # "0" for wechat
-                if self.__receiver and self.__receiver.place_zip:
-                    req_headers["pp-placezip"] = str(self.__receiver.place_zip)
-            case ClientType.kWeb:
-                req_headers["User-Agent"] = self.web_user_agent
-                req_headers["pp-os"] = "201"
-                if self.__receiver and self.__receiver.city_zip:
-                    req_headers["pp-cityzip"] = str(self.__receiver.city_zip)
-            case _:
-                raise NotImplementedError
+        if client == ClientType.kNative:
+            req_headers["User-Agent"] = self.native_user_agent
+            req_headers["pp-os"] = "20"  # "0" for wechat
+            if self.__receiver and self.__receiver.place_zip:
+                req_headers["pp-placezip"] = str(self.__receiver.place_zip)
+        elif client == ClientType.kWeb:
+            req_headers["User-Agent"] = self.web_user_agent
+            req_headers["pp-os"] = "201"
+            if self.__receiver and self.__receiver.city_zip:
+                req_headers["pp-cityzip"] = str(self.__receiver.city_zip)
+        else:
+            raise NotImplementedError
         if headers:
             req_headers.update(headers)
         async with self.__session.request(
@@ -184,21 +188,21 @@ class ApiBase(object):
 class Api(ApiBase):
 
     def __init__(self, device_id: str, refresh_token: str,
-                 access_token: None | str, expires_in: None | int):
+                 access_token: Optional[str], expires_in: Optional[int]):
         if not (device_id and refresh_token):
             raise ValueError("参数没有正确设置")
         super().__init__(device_id=device_id)
-        self.__refresh_token: None | str = refresh_token
+        self.__refresh_token: Optional[str] = refresh_token
         self._nickname = self._avatar = None
         self.__expires_in = expires_in or 0
         self.access_token = access_token
 
     @property
-    def nickname(self) -> None | str:
+    def nickname(self) -> Optional[str]:
         return self._nickname
 
     @property
-    def avatar(self) -> None | str:
+    def avatar(self) -> Optional[str]:
         return self._avatar
 
     @property
@@ -206,7 +210,7 @@ class Api(ApiBase):
         return self.__refresh_token
 
     @refresh_token.setter
-    def refresh_token(self, token: None | str):
+    def refresh_token(self, token: Optional[str]):
         self.__refresh_token = token
 
     @property
@@ -214,12 +218,12 @@ class Api(ApiBase):
         return self.__expires_in
 
     @expires_in.setter
-    def expires_in(self, v: None | int):
+    def expires_in(self, v: Optional[int]):
         self.__expires_in = v or 0
 
     async def RefreshAccessToken(self):
         """刷新AccessToken 有效期通常只有2小时"""
-        initial_tasks = [self.GetServerTime()]
+        initial_tasks: list[Any] = [self.GetServerTime()]
         if not self.su_id:
             initial_tasks.append(self.GetSuID())
         current_time = (await aio_gather(*initial_tasks))[0]
@@ -250,8 +254,8 @@ class Api(ApiBase):
                         or (obj["errcode"] != 200099 and obj["errcode"] in range(200000, 300000)):
                     self.__refresh_token = None
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetSuID(self):
         try:
@@ -265,8 +269,8 @@ class Api(ApiBase):
                 return ApiResults.SuId(id=self.su_id)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetUserInfo(self):
         """
@@ -295,10 +299,10 @@ class Api(ApiBase):
                 return ApiResults.UserInfo(avatar=self._avatar, nickname=self._nickname)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
-    async def GetReceiver(self, filter: None | str = None):
+    async def GetReceiver(self, filter: Optional[str] = None):
         """获得收货地址"""
         try:
             obj = await self._SendRequest(
@@ -354,8 +358,8 @@ class Api(ApiBase):
                 return ApiResults.ReceiverInfo(info)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def SignIn(self):
         """签到"""
@@ -373,8 +377,8 @@ class Api(ApiBase):
                                          explanation=data["reward_explanation"])
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetSignPeriodInfo(self):
         """获得本周连续签到的天数"""
@@ -389,10 +393,10 @@ class Api(ApiBase):
                 return ApiResults.SignPeriodInfo(data["signed_days"])
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
-    async def GetBanner(self, link_type: BANNER_LINK_TYPE, position_types: None | list[int | str] = None):
+    async def GetBanner(self, link_type: BANNER_LINK_TYPE, position_types: Optional[list[Union[int, str]]] = None):
         assert self.receiver
         try:
             co_req = self._SendRequest(
@@ -424,8 +428,8 @@ class Api(ApiBase):
                 return ApiResults.Banner(banners)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetLotteryInfo(self, id: str):
         """获取抽奖活动的信息"""
@@ -461,8 +465,8 @@ class Api(ApiBase):
             else:
                 # 获取抽奖信息失败
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetUserLotteryInfo(self, lottery: PLotteryInfo):
         try:
@@ -475,8 +479,8 @@ class Api(ApiBase):
                 return ApiResults.UserLotteryInfo(remain_chances=num)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetTaskGroupsData(self, lottery: PLotteryInfo):
         """获取任务列表"""
@@ -514,8 +518,8 @@ class Api(ApiBase):
                 return ApiResults.TaskGroupsData(tasks)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def PostPageTaskComplete(self, lottery: PLotteryInfo, task: PTask):
         """完成浏览任务"""
@@ -541,8 +545,8 @@ class Api(ApiBase):
                 return ApiResults.TaskCompleted()
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetChanceEntrances(self, lottery: PLotteryInfo):
         try:
@@ -573,8 +577,8 @@ class Api(ApiBase):
                 return ApiResults.ChanceEntrances(coin_balance, entrances)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def CoinExchange(self, lottery: PLotteryInfo, entrance: PChanceEntrance):
         """开始积分兑换"""
@@ -591,8 +595,8 @@ class Api(ApiBase):
                 return ApiResults.CoinExchanged(entrance.gain_num)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def Lottery(self, lottery: PLotteryInfo):
         """开始抽奖"""
@@ -605,12 +609,12 @@ class Api(ApiBase):
                 json={},
                 client=ClientType.kWeb)
             if obj["errcode"] == 0:
-                prize = lottery.prizes.get(obj["data"]["prize_level"])
+                prize = lottery.prizes[obj["data"]["prize_level"]]
                 return ApiResults.LotteryResult(prize)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetProductCollections(self, page: int):
         """获取商品收藏列表"""
@@ -652,8 +656,8 @@ class Api(ApiBase):
                 return ApiResults.ProductCollections(total_count, products)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetUsableCoupons(self,  type: DiscountType, products: list[PProduct]):
         """获得可用的优惠券"""
@@ -710,8 +714,8 @@ class Api(ApiBase):
                 return ApiResults.UsableCoupons(coupons=ids, rules=rules)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetDeliveryTime(self, products: list[PProduct], start_hours: int):
         assert self.receiver
@@ -758,10 +762,10 @@ class Api(ApiBase):
                 return ApiResults.DeliveryTime(dtime_type, dtime_promise)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
-    async def CreateOrder(self, pay_type: int, coupons: None | list[str], products: list[PProduct],
+    async def CreateOrder(self, pay_type: int, coupons: Optional[list[str]], products: list[PProduct],
                           dtime_type: DeliveryTimeType, dtime_promise: int):
         """创建订单"""
         assert self.receiver
@@ -822,13 +826,13 @@ class Api(ApiBase):
                 return ApiResults.OrderCreated(id=data["id"])
             elif dtime_type == DeliveryTimeType.IMMEDIATE and obj["errmsg"].find("重新选择"):
                 # 亲，该订单期望送达时间不在我们配送时间范围内，请重新选择送达时间
-                rr: ApiResults.Error | ApiResults.OrderCreated = await self.CreateOrder(
+                rr: Union[ApiResults.Error, ApiResults.OrderCreated] = await self.CreateOrder(
                     pay_type, coupons, products, DeliveryTimeType.RESERVE, dtime_promise)
                 return rr
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetOrdersList(self, page: int):
         """获得订单列表"""
@@ -859,8 +863,8 @@ class Api(ApiBase):
                 return ApiResults.OrdersList(total_count, orders)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
     async def GetWxDiscountShare(self, share: PDiscountShare):
         """拆微信红包"""
@@ -882,17 +886,16 @@ class Api(ApiBase):
                 if not discount_id:
                     # 我没抢到优惠券
                     discount_rule = None
-                    match status:
-                        case SHARE_STATUS.NULL:
-                            # 红包已经空了
-                            log(f"{share.share_id}: status = NULL")
-                        case SHARE_STATUS.EXPIRED:
-                            # 红包过期了
-                            log(f"{share.share_id}: status = EXPIRED")
-                        case _:
-                            # 红包抢太多被限制了吗
-                            over_limit: bool = data["over_limit"]
-                            log(f"{share.share_id}: over_limit = {over_limit}")
+                    if status == SHARE_STATUS.NULL:
+                        # 红包已经空了
+                        log(f"{share.share_id}: status = NULL")
+                    elif status == SHARE_STATUS.EXPIRED:
+                        # 红包过期了
+                        log(f"{share.share_id}: status = EXPIRED")
+                    else:
+                        # 红包抢太多被限制了吗
+                        over_limit: bool = data["over_limit"]
+                        log(f"{share.share_id}: over_limit = {over_limit}")
                 else:
                     discount_rule = PDiscountRule(
                         id=rule["discount_id"],
@@ -906,8 +909,8 @@ class Api(ApiBase):
                     available=status == SHARE_STATUS.NORMAL and enabled)
             else:
                 return ApiResults.Error(json=obj)
-        except Exception as e:
-            return ApiResults.Error(exception=e)
+        except Exception:
+            return ApiResults.Exception()
 
 
 class Client(Api):
@@ -978,7 +981,7 @@ class Client(Api):
         self._saved = True
         return True
 
-    async def InitializeToken(self, address_filter: None | str):
+    async def InitializeToken(self, address_filter: Optional[str]):
         """初始化"""
         self.LoadConfig(force=True)
 

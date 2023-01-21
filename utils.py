@@ -1,33 +1,40 @@
-from checksendNotify import send
 import json
 import os
-import sys
 import platform
 import random
 import re
 import sqlite3
+import sys
 import time
 import traceback
-from functools import wraps
-from typing import Any, BinaryIO
-from fasteners.process_lock import InterProcessReaderWriterLock
-from enum import Enum
 from asyncio import sleep as aio_sleep
+from enum import Enum, IntEnum
+from functools import wraps
+from sys import version_info as py_version
+from typing import Any, Optional  # 确保兼容<=Python3.9
+
+assert py_version >= (3, 9)
 
 
 def pip_install():
     print("正在安装依赖")
     os.system(
-        "pip3 install requests rsa tomli tomli_w beautifulsoup4 aiohttp aiohttp_retry")
+        "pip3 install requests rsa tomli tomli_w beautifulsoup4 fasteners aiohttp aiohttp_retry")
 
 
 try:
     import tomli
     import tomli_w
+    from fasteners.process_lock import InterProcessReaderWriterLock
+
+    from checksendNotify import send
 except ModuleNotFoundError:
     pip_install()
     import tomli
     import tomli_w
+    from fasteners.process_lock import InterProcessReaderWriterLock
+
+    from checksendNotify import send
 
 
 # def toml_to_json(toml_path, to_json_path):
@@ -173,7 +180,6 @@ class config_get(object):
 
     @staticmethod
     def set_value_for_toml(toml_path, key: str, value: Any):
-        f: BinaryIO = None
         try:
             with open(toml_path, "rb") as f:
                 try:
@@ -228,6 +234,7 @@ class config_get(object):
                 return json_dict.keys()
             except json.decoder.JSONDecodeError:
                 print(f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}")
+                return []
 
 
 class check(object):
@@ -255,7 +262,7 @@ class check(object):
         def wrapper():
             if not self.Configuration_flag:
                 config = config_get()
-                value_list = config.get_value(self.run_script_expression)
+                value_list = config.get_value(self.run_script_expression) or []
                 push_message = ""
                 num = 0
                 for value in value_list:
@@ -367,7 +374,7 @@ async def aio_randomSleep(min=1, max=6):
     await aio_sleep(interval)
 
 
-def log(s: object, msg_list: None | list[str] = None):
+def log(s: object, msg_list: Optional[list[str]] = None):
     print(s)
     if msg_list is not None:
         msg_list += [str(s)]
@@ -399,30 +406,31 @@ def cookie_to_dic(cookie: str):
     return {item.split('=')[0]: item.split('=')[1] for item in cookie.split('; ')}
 
 
-class default:
-    """给Enum添加默认值"""
+class MyIntEnum(IntEnum):
+    """在IntEnum基础上增加了自动创建枚举值的能力"""
 
-    def __init__(self, **kwargs):
-        if "value" in kwargs:
-            self.__default = kwargs["value"]
+    @classmethod
+    def _missing_(cls, value):
+        """
+        Returns member (possibly creating it) if one can be found for value.
+        """
+        if not isinstance(value, int):
+            raise ValueError("%r is not a valid %s" %
+                             (value, cls.__qualname__))
+        new_member = cls._create_pseudo_member_(value)
+        log(f"警告: {cls.__name__} 没有定义 '{value}', 已自动创建")
+        return new_member
 
-    def __call__(self, cls):
-        if issubclass(cls, Enum):
-            @classmethod
-            def missing(cls, value):
-                if hasattr(self, "__default"):
-                    assert value != self.__default
-                    log(f"警告: {cls.__name__} 没有定义 '{value}', 使用默认值'{self.__default}'替代")
-                    return cls(self.__default)
-                else:
-                    for index, member in enumerate(cls):
-                        if index == 0:
-                            log(f"警告: {cls.__name__} 没有定义 '{value}', 使用第{index+1}个枚举值'{member.name}({member.value})'替代")
-                            return member
-                    return None
-
-            cls._missing_ = missing
-        return cls
+    @classmethod
+    def _create_pseudo_member_(cls, value):
+        pseudo_member = cls._value2member_map_.get(value, None)
+        if pseudo_member is None:
+            pseudo_member = int.__new__(cls, value)
+            pseudo_member._name_ = str(value)  # 以值作为枚举名 不会有冲突
+            pseudo_member._value_ = value
+            pseudo_member = cls._value2member_map_.setdefault(
+                value, pseudo_member)
+        return pseudo_member
 
 
 if __name__ == "__main__":

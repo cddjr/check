@@ -417,12 +417,12 @@ class MyIntEnum(IntEnum):
         if not isinstance(value, int):
             raise ValueError("%r is not a valid %s" %
                              (value, cls.__qualname__))
-        new_member = cls._create_pseudo_member_(value)
+        new_member = cls.__CreatePseudoMember(value)
         log(f"警告: {cls.__name__} 没有定义 '{value}', 已自动创建")
         return new_member
 
     @classmethod
-    def _create_pseudo_member_(cls, value):
+    def __CreatePseudoMember(cls, value):
         pseudo_member = cls._value2member_map_.get(value, None)
         if pseudo_member is None:
             pseudo_member = int.__new__(cls, value)

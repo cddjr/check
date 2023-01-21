@@ -199,6 +199,11 @@ class PReceiverInfo:
     place_zip: int = 0
     city_zip: int = 0
 
+    @property
+    def id_empty(self):
+        """只判断ID"""
+        return not self.id or not self.store_id or not self.place_id
+
 
 @dataclass
 class PPrize:

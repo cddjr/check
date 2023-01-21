@@ -46,7 +46,8 @@ class PUPU:
     async def sign(self):
         msg: list[str] = []
         async with PClient(self.device_id, self.refresh_token) as api:
-            result = await api.InitializeToken(self.check_item.get("addr_filter"))
+            result = await api.InitializeToken(self.check_item.get("addr_filter"),
+                                               force_update_receiver=False)
             if isinstance(result, ApiResults.Error):
                 log(result, msg)
                 return msg

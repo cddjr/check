@@ -21,7 +21,7 @@ class ApiBase(object):
         assert device_id
         self.__device_id = device_id.upper()
         self.__su_id = self.__access_token = self.__user_id = None
-        self.__receiver = None
+        self.__receiver = PReceiverInfo("")
         self.__server_date_diff = None
         self.__init_http()
 
@@ -100,13 +100,13 @@ class ApiBase(object):
         return self.__receiver
 
     @receiver.setter
-    def receiver(self, receiver: Optional[PReceiverInfo]):
+    def receiver(self, receiver: PReceiverInfo):
         self.__receiver = receiver
-        if receiver and receiver.place_id:
+        if receiver.place_id:
             self.__session._client.headers["pp-placeid"] = receiver.place_id
         elif "pp-placeid" in self.__session._client.headers:
             del self.__session._client.headers["pp-placeid"]
-        if receiver and receiver.store_id:
+        if receiver.store_id:
             # 朴朴这里用的下划线
             self.__session._client.headers["pp_storeid"] = receiver.store_id
         elif "pp_storeid" in self.__session._client.headers:
@@ -162,12 +162,12 @@ class ApiBase(object):
         if client == ClientType.kNative:
             req_headers["User-Agent"] = self.native_user_agent
             req_headers["pp-os"] = "20"  # "0" for wechat
-            if self.__receiver and self.__receiver.place_zip:
+            if self.__receiver.place_zip:
                 req_headers["pp-placezip"] = str(self.__receiver.place_zip)
         elif client == ClientType.kWeb:
             req_headers["User-Agent"] = self.web_user_agent
             req_headers["pp-os"] = "201"
-            if self.__receiver and self.__receiver.city_zip:
+            if self.__receiver.city_zip:
                 req_headers["pp-cityzip"] = str(self.__receiver.city_zip)
         else:
             raise NotImplementedError
@@ -302,7 +302,7 @@ class Api(ApiBase):
         except Exception:
             return ApiResults.Exception()
 
-    async def GetReceiver(self, filter: Optional[str] = None):
+    async def UpdateReceiver(self, filter: Optional[str] = None):
         """获得收货地址"""
         try:
             obj = await self._SendRequest(
@@ -349,11 +349,16 @@ class Api(ApiBase):
                             if info.address.find(filter) != -1:
                                 # 匹配上了
                                 break
+                            info = None  # 不符合筛选条件 需要置空
                             time_last_order = 0
                         elif r.get("is_default", False):
                             # 如果是默认地址则直接用(似乎朴朴并没有设置)
                             break
-                assert info
+                if not info:
+                    if filter:
+                        raise ValueError(f"没有符合筛选条件的收货地址, 当前条件`{filter}`")
+                    else:
+                        raise ValueError("没有收货地址")
                 self.receiver = info
                 return ApiResults.ReceiverInfo(info)
             else:
@@ -367,7 +372,7 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kPost,
                 "https://j1.pupuapi.com/client/game/sign/v2",
-                params={"city_zip": self.receiver.city_zip if self.receiver else 0,
+                params={"city_zip": self.receiver.city_zip,
                         "supplement_id": ""},
                 client=ClientType.kWeb)
             if obj["errcode"] == 0:
@@ -397,7 +402,7 @@ class Api(ApiBase):
             return ApiResults.Exception()
 
     async def GetBanner(self, link_type: BANNER_LINK_TYPE, position_types: Optional[list[Union[int, str]]] = None):
-        assert self.receiver
+        assert not self.receiver.id_empty
         try:
             co_req = self._SendRequest(
                 HttpMethod.kGet,
@@ -586,8 +591,8 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kPost,
                 f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{lottery.id}/coin_exchange",
-                params={"lng_x": self.receiver.lng_x if self.receiver else None,
-                        "lat_y": self.receiver.lat_y if self.receiver else None},
+                params={"lng_x": self.receiver.lng_x,
+                        "lat_y": self.receiver.lat_y},
                 json={},
                 client=ClientType.kWeb)
             if obj["errcode"] == 0:
@@ -604,8 +609,8 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kPost,
                 f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{lottery.id}/lottery",
-                params={"lng_x": self.receiver.lng_x if self.receiver else None,
-                        "lat_y": self.receiver.lat_y if self.receiver else None},
+                params={"lng_x": self.receiver.lng_x,
+                        "lat_y": self.receiver.lat_y},
                 json={},
                 client=ClientType.kWeb)
             if obj["errcode"] == 0:
@@ -618,7 +623,7 @@ class Api(ApiBase):
 
     async def GetProductCollections(self, page: int):
         """获取商品收藏列表"""
-        assert self.receiver
+        assert not self.receiver.id_empty
         try:
             obj = await self._SendRequest(
                 HttpMethod.kGet,
@@ -661,7 +666,7 @@ class Api(ApiBase):
 
     async def GetUsableCoupons(self,  type: DiscountType, products: list[PProduct]):
         """获得可用的优惠券"""
-        assert self.receiver
+        assert not self.receiver.id_empty
         try:
             order_items = []
             for pi in products:
@@ -718,7 +723,7 @@ class Api(ApiBase):
             return ApiResults.Exception()
 
     async def GetDeliveryTime(self, products: list[PProduct], start_hours: int):
-        assert self.receiver
+        assert not self.receiver.id_empty
         try:
             json = []
             for pi in products:
@@ -768,7 +773,7 @@ class Api(ApiBase):
     async def CreateOrder(self, pay_type: int, coupons: Optional[list[str]], products: list[PProduct],
                           dtime_type: DeliveryTimeType, dtime_promise: int):
         """创建订单"""
-        assert self.receiver
+        assert not self.receiver.id_empty and self.receiver.address and self.receiver.receiver_name
         order_items = []
         for pi in products:
             obj = {
@@ -791,8 +796,8 @@ class Api(ApiBase):
             "device_os": "20",
             "discount_entity_ids": coupons or [],
             "external_payment_amount": 0,  # 总金额(分) 无所谓
-            "lat_y": self.receiver.lat_y,
-            "lng_x": self.receiver.lng_x,
+            "lat_y": self.receiver.lat_y or 0.0,
+            "lng_x": self.receiver.lng_x or 0.0,
             "logistics_fee": 0,  # 运费(分) 似乎也无所谓
             "number_protection": 1,
             "order_items": order_items,
@@ -971,17 +976,18 @@ class Client(Api):
         self._config_dict["access_expires"] = self.expires_in
         self._config_dict["su_id"] = self.su_id or ""
         self._config_dict["user_id"] = self.user_id or ""
-        self._config_dict["recv_id"] = self.receiver.id if self.receiver else ""
-        self._config_dict["store_id"] = self.receiver.store_id if self.receiver else ""
-        self._config_dict["place_id"] = self.receiver.place_id if self.receiver else ""
-        self._config_dict["city_zip"] = self.receiver.city_zip if self.receiver else 0
-        self._config_dict["place_zip"] = self.receiver.place_zip if self.receiver else 0
+        self._config_dict["recv_id"] = self.receiver.id
+        self._config_dict["store_id"] = self.receiver.store_id
+        self._config_dict["place_id"] = self.receiver.place_id
+        self._config_dict["city_zip"] = self.receiver.city_zip
+        self._config_dict["place_zip"] = self.receiver.place_zip
         self._config_dict["avatar"] = self.avatar or ""
         self._config.set_value(self.device_id, self._config_dict)
         self._saved = True
         return True
 
-    async def InitializeToken(self, address_filter: Optional[str]):
+    async def InitializeToken(self, address_filter: Optional[str] = None,
+                              force_update_receiver: bool = True):
         """初始化"""
         self.LoadConfig(force=True)
 
@@ -989,9 +995,10 @@ class Client(Api):
         if isinstance(token_result, ApiResults.Error):
             return token_result
 
-        recv_result = await self.GetReceiver(filter=address_filter)
-        if isinstance(recv_result, ApiResults.Error):
-            return recv_result
+        if force_update_receiver or self.receiver.id_empty:
+            recv_result = await self.UpdateReceiver(filter=address_filter)
+            if isinstance(recv_result, ApiResults.Error):
+                return recv_result
         return token_result
 
     async def __aenter__(self):

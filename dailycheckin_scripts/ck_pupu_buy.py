@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 57 59 17,21 * * *
+cron: 56 59 17,21 * * *
 new Env('朴朴抢购');
 
 微信登录朴朴app
@@ -128,9 +128,9 @@ class PUPU:
             if price_reduction <= 0:
                 # 第1次检测没有降价 等待片刻
                 await asyncio.sleep(0.5)
-                # 开始第2次检测 总共10次
+                # 开始第2次检测 总共3次
                 retry = 2
-                while (retry <= 10):
+                while (retry <= 3):
                     _, results = await asyncio.gather(
                         asyncio.sleep(0.5),
                         self.DetectProducts(api))
@@ -175,6 +175,7 @@ class PUPU:
                     log(order_result, msg)
                 else:
                     log(f'订单创建成功 {order_result.id}', msg)
+                    log(f'当前服务器时间: {api.TryGetServerTime() or 0}')
                     msg += await self.ServerJ("朴朴降价了", f"{order_result.id}")
             elif price_reduction <= 0:
                 log('无降价', msg)

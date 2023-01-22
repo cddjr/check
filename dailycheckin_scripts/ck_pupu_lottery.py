@@ -80,7 +80,7 @@ class PUPU:
 
             if len(lottery_ids) > 0:
                 self.exchange_limit = self.check_item.get("coin_exchange", 0)
-                log(f'积分兑换限制数: {self.exchange_limit}次', msg)
+                log(f'朴分兑换限制数: {self.exchange_limit}次', msg)
                 for id in lottery_ids:
                     # 串行抽奖 确保print按顺序执行
                     msg += await self._Lottery(api, id)
@@ -105,6 +105,8 @@ class PUPU:
         task_groups, chance_info = await asyncio.gather(
             api.GetTaskGroupsData(info.lottery),
             api.GetChanceEntrances(info.lottery))
+        if isinstance(chance_info, ApiResults.ChanceEntrances):
+            log(f' 当前朴分: {chance_info.coin_balance}', msg)
         if isinstance(task_groups, ApiResults.Error):
             log(task_groups, msg)
         elif not task_groups.tasks:
@@ -122,7 +124,7 @@ class PUPU:
                     else:
                         log(f'    {task.task_name}: 已完成')
 
-        # 接着尝试积分兑换
+        # 接着尝试朴分兑换
         exchange_count = 0
         while (True):
             if isinstance(chance_info, ApiResults.Error):
@@ -135,22 +137,22 @@ class PUPU:
                 break
             for entrance in chance_info.entrances:
                 if entrance.type == CHANCE_OBTAIN_TYPE.COIN_EXCHANGE:
-                    # 目前只支持积分兑换
+                    # 目前只支持朴分兑换
                     break
             else:
-                # 没有可用的积分兑换入口
+                # 没有可用的朴分兑换入口
                 entrance = None
             if entrance:
                 while chance_info.coin_balance >= entrance.target_value \
                         and exchange_count < self.exchange_limit:
-                    # 积分足够、兑换次数没超过限制
+                    # 朴分足够、兑换次数没超过限制
                     exchange_result = await api.CoinExchange(info.lottery, entrance)
                     if isinstance(exchange_result, ApiResults.Error):
                         log(exchange_result)
                         break
                     exchange_count += 1
                     log(f'    第{exchange_count}次{entrance.title}: 成功兑换{exchange_result.gain_num}次抽奖机会')
-                    # 更新积分余额
+                    # 更新朴分余额
                     chance_info = await api.GetChanceEntrances(info.lottery)
                     if isinstance(chance_info, ApiResults.Error):
                         # 拉取失败了
@@ -158,18 +160,18 @@ class PUPU:
                         break
                 else:
                     if chance_info.coin_balance < entrance.target_value:
-                        log(f" 当前积分{chance_info.coin_balance}少于{entrance.target_value}, 放弃兑换")
+                        log(f" 当前朴分{chance_info.coin_balance}少于{entrance.target_value}, 放弃兑换")
                 if exchange_count > 0:
-                    # 成功兑换了积分后需要等待2秒确保抽奖机会数更新
+                    # 成功兑换了朴分后需要等待2秒确保抽奖机会数更新
                     await asyncio.sleep(2)
             # 开始抽奖
             result, lottery_msg = await self.__Lottery(api, info)
             msg += lottery_msg
             if not result:
                 break
-            # 稍等片刻确保积分余额更新
+            # 稍等片刻确保朴分余额更新
             await asyncio.sleep(2)
-            # 获取积分余额
+            # 更新朴分余额
             chance_info = await api.GetChanceEntrances(info.lottery)
         return msg
 

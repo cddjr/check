@@ -377,7 +377,7 @@ class Api(ApiBase):
                 client=ClientType.kWeb)
             if obj["errcode"] == 0:
                 data = obj["data"]
-                # 积分
+                # 朴分
                 return ApiResults.SignIn(coin=data["daily_sign_coin"],
                                          explanation=data["reward_explanation"])
             else:
@@ -394,7 +394,6 @@ class Api(ApiBase):
             )
             if obj["errcode"] == 0:
                 data = obj["data"]
-                # 积分
                 return ApiResults.SignPeriodInfo(data["signed_days"])
             else:
                 return ApiResults.Error(json=obj)
@@ -586,7 +585,7 @@ class Api(ApiBase):
             return ApiResults.Exception()
 
     async def CoinExchange(self, lottery: PLotteryInfo, entrance: PChanceEntrance):
-        """开始积分兑换"""
+        """开始朴分兑换"""
         try:
             obj = await self._SendRequest(
                 HttpMethod.kPost,

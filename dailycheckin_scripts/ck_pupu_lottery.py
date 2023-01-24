@@ -145,7 +145,7 @@ class PUPU:
                         and exchange_count < self.exchange_limit:
                     # 朴分足够、兑换次数没超过限制
                     _, exchange_result = await asyncio.gather(
-                        asyncio.sleep(2),  # 间隔2秒，确保朴分、抽奖机会数更新
+                        aio_randomSleep(4, 8),  # 间隔4~8秒，确保朴分、抽奖机会数更新
                         api.CoinExchange(info.lottery, entrance))
                     if isinstance(exchange_result, ApiResults.Error):
                         log(exchange_result)
@@ -184,9 +184,9 @@ class PUPU:
 
         log(f' 当前有{chances_info.remain_chances}次抽奖机会', msg)
         for i in range(chances_info.remain_chances):
-            # 每次抽奖至少间隔2~5秒的时间
+            # 每次抽奖至少间隔4~8秒的时间
             _, lottery_result = await asyncio.gather(
-                aio_randomSleep(2, 5),
+                aio_randomSleep(4, 8),
                 api.Lottery(info.lottery))
             if isinstance(lottery_result, ApiResults.Error):
                 log(f'  第{i+1}次抽奖: {lottery_result}', msg)

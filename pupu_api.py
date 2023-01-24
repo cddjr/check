@@ -233,6 +233,8 @@ class Api(ApiBase):
         self.access_token = None
         self.user_id = None
         try:
+            if not self.__refresh_token:
+                raise ValueError("没有配置 refresh_token")
             obj = await self._SendRequest(
                 HttpMethod.kPut,
                 "https://cauth.pupuapi.com/clientauth/user/refresh_token",

@@ -168,15 +168,18 @@ class config_get(object):
 
     @staticmethod
     def get_value_for_toml(toml_path, key):
-        with open(toml_path, "rb") as f:
-            try:
-                toml_dict = tomli.load(f)
-                return toml_dict.get(key)
-            except tomli.TOMLDecodeError:
-                print(
-                    f"错误：配置文件 {toml_path} 格式不对，请学习 https://toml.io/cn/v1.0.0\n错误信息：\n{traceback.format_exc()}"
-                )
-                exit(1)
+        try:
+            with open(toml_path, "rb") as f:
+                try:
+                    toml_dict = tomli.load(f)
+                    return toml_dict.get(key)
+                except tomli.TOMLDecodeError:
+                    print(
+                        f"错误：配置文件 {toml_path} 格式不对，请学习 https://toml.io/cn/v1.0.0\n错误信息：\n{traceback.format_exc()}"
+                    )
+                    exit(1)
+        except OSError:
+            return None
 
     @staticmethod
     def set_value_for_toml(toml_path, key: str, value: Any):
@@ -207,34 +210,45 @@ class config_get(object):
 
     @staticmethod
     def get_value_for_json(json_path, key):
-        with open(json_path, "r", encoding="utf8") as f:
-            try:
-                json_dict = json.load(f)
-                return json_dict.get(key)
-            except json.decoder.JSONDecodeError:
-                print(f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}")
+        try:
+            with open(json_path, "r", encoding="utf8") as f:
+                try:
+                    json_dict = json.load(f)
+                    return json_dict.get(key)
+                except json.decoder.JSONDecodeError:
+                    print(
+                        f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}")
+        except OSError:
+            return None
 
     @staticmethod
     def get_key_for_toml(toml_path):
-        with open(toml_path, "rb") as f:
-            try:
-                toml_dict = tomli.load(f)
-                return toml_dict.keys()
-            except tomli.TOMLDecodeError:
-                print(
-                    f"错误：配置文件 {toml_path} 格式不对，请学习 https://toml.io/cn/v1.0.0\n错误信息：\n{traceback.format_exc()}"
-                )
-                exit(1)
+        try:
+            with open(toml_path, "rb") as f:
+                try:
+                    toml_dict = tomli.load(f)
+                    return toml_dict.keys()
+                except tomli.TOMLDecodeError:
+                    print(
+                        f"错误：配置文件 {toml_path} 格式不对，请学习 https://toml.io/cn/v1.0.0\n错误信息：\n{traceback.format_exc()}"
+                    )
+                    exit(1)
+        except OSError:
+            return []
 
     @staticmethod
     def get_key_for_json(json_path):
-        with open(json_path, "r", encoding="utf8") as f:
-            try:
-                json_dict = json.load(f)
-                return json_dict.keys()
-            except json.decoder.JSONDecodeError:
-                print(f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}")
-                return []
+        try:
+            with open(json_path, "r", encoding="utf8") as f:
+                try:
+                    json_dict = json.load(f)
+                    return json_dict.keys()
+                except json.decoder.JSONDecodeError:
+                    print(
+                        f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}")
+                    return []
+        except OSError:
+            return []
 
 
 class check(object):
@@ -393,7 +407,7 @@ def GetScriptConfig(filename: str):
             if not os.path.isdir(cache_dir):
                 raise
         config = config_get(os.path.join(cache_dir, f"{filename}.toml"))
-        config.set_value("Version", 1)
+        # config.set_value("Version", 1)
         return config
     except:
         print(traceback.format_exc())

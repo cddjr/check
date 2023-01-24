@@ -37,6 +37,8 @@ class ApiBase(object):
         self.__session._client.headers["Connection"] = "keep-alive"
 
     async def Release(self):
+        if self.__session._closed:
+            return
         await self.__session.close()
         # Wait 250 ms for the underlying SSL connections to close
         await aio_sleep(0.250)
@@ -1010,9 +1012,8 @@ class Client(Api):
         if isinstance(token_result, ApiResults.Error):
             return token_result
         elif isinstance(token_result, ApiResults.TokenRefreshed):
-            if token_result.changed:
-                # 确保及时保存
-                self.SaveConfig()
+            # 确保及时保存
+            self.SaveConfig()
 
         if force_update_receiver or self.receiver.id_empty:
             recv_result = await self.UpdateReceiver(filter=address_filter)

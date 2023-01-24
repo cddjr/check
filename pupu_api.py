@@ -12,6 +12,9 @@ from utils import GetScriptConfig, log
 
 assert py_version >= (3, 9)
 
+server_date_diff = None
+server_date_updating = False
+
 
 class ApiBase(object):
 
@@ -22,7 +25,6 @@ class ApiBase(object):
         self.__device_id = device_id.upper()
         self.__su_id = self.__access_token = self.__user_id = None
         self.__receiver = PReceiverInfo("")
-        self.__server_date_diff = None
         self.__init_http()
 
     def __init_http(self):
@@ -112,21 +114,31 @@ class ApiBase(object):
         elif "pp_storeid" in self.__session._client.headers:
             del self.__session._client.headers["pp_storeid"]
 
-    async def GetServerTime(self):
+    async def GetServerTime(self, force=False):
         """获得与服务器尽可能一致的时间戳"""
-        if self.__server_date_diff is None:
-            result = await self.ComputeServerTimeDiff()
+        global server_date_diff, server_date_updating
+        while server_date_updating:
+            await aio_sleep(0)
+        if server_date_diff is None or force:
+            try:
+                server_date_updating = True
+                result = await self.ComputeServerTimeDiff()
+            finally:
+                server_date_updating = False
             if isinstance(result, ApiResults.Error):
                 log(result)
-                return int(time()*1000)
+                if server_date_diff is None:
+                    return int(time()*1000)
             else:
-                self.__server_date_diff = result
-        return int(time()*1000 + self.__server_date_diff)
+                server_date_diff = result
+        return int(time()*1000 + server_date_diff)
 
-    def TryGetServerTime(self):
+    @staticmethod
+    def TryGetServerTime():
         """类似GetServerTime"""
-        if self.__server_date_diff is not None:
-            return int(time()*1000 + self.__server_date_diff)
+        global server_date_diff
+        if server_date_diff is not None:
+            return int(time()*1000 + server_date_diff)
         return None
 
     async def ComputeServerTimeDiff(self):
@@ -245,12 +257,14 @@ class Api(ApiBase):
                 self.access_token = data.get("access_token")
                 self.user_id = data.get("user_id")
                 # refresh_token 在临期时会更新 我们需要保存新的token 否则很快就得重新登录
+                prev_refresh_token = self.__refresh_token
                 self.__refresh_token = data.get(
                     "refresh_token", self.__refresh_token)
                 self.__expires_in = int(data.get('expires_in', 0))
                 self._nickname = data.get("nick_name")
                 return ApiResults.TokenRefreshed(refresh_token=self.__refresh_token,
-                                                 access_expires=self.__expires_in)
+                                                 access_expires=self.__expires_in,
+                                                 changed=self.__refresh_token != prev_refresh_token)
             else:
                 if obj["errcode"] == 403 \
                         or (obj["errcode"] != 200099 and obj["errcode"] in range(200000, 300000)):
@@ -995,6 +1009,10 @@ class Client(Api):
         token_result = await self.RefreshAccessToken()
         if isinstance(token_result, ApiResults.Error):
             return token_result
+        elif isinstance(token_result, ApiResults.TokenRefreshed):
+            if token_result.changed:
+                # 确保及时保存
+                self.SaveConfig()
 
         if force_update_receiver or self.receiver.id_empty:
             recv_result = await self.UpdateReceiver(filter=address_filter)

@@ -349,6 +349,7 @@ class ApiResults:
     class TokenRefreshed:
         refresh_token: str
         access_expires: int
+        changed:bool = False
 
     @dataclass
     class TokenValid:

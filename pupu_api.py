@@ -902,7 +902,6 @@ class Api(ApiBase):
                 status = SHARE_STATUS(data.get('status', SHARE_STATUS.ERROR))
                 best_luck: bool = data.get("best_luck", False)  # 我是否最佳
                 reentry: bool = data["reentry"]  # 已领取过该优惠券了哦
-                users: list = data.get("list", [])
                 rule = data.get("rule", {})  # 我抢到的优惠券 可能为空
                 discount_id = rule.get("discount_id")
                 if not discount_id:
@@ -925,8 +924,14 @@ class Api(ApiBase):
                         condition_amount=rule["condition_amount"],
                         discount_amount=rule["discount_amount"],
                     )
+                users = [PShareUser(
+                    avatar=item["avatar"],
+                    name=item["name"],
+                    best=item["max"],
+                    time=item["time"],
+                ) for item in data.get("list", [])]
                 return ApiResults.WxDiscountShare(
-                    best_luck, reentry, len(users),
+                    best_luck, reentry, users,
                     discount=discount_rule,
                     available=status == SHARE_STATUS.NORMAL and enabled)
             else:

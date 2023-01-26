@@ -313,6 +313,14 @@ class PBanner:
     link_id: str
 
 
+@dataclass
+class PShareUser:
+    avatar: str
+    name: str
+    best: bool  # 是否最佳
+    time: int  # 抢包时间
+
+
 class ApiResults:
     class Error:
 
@@ -349,7 +357,7 @@ class ApiResults:
     class TokenRefreshed:
         refresh_token: str
         access_expires: int
-        changed:bool = False
+        changed: bool = False
 
     @dataclass
     class TokenValid:
@@ -438,7 +446,7 @@ class ApiResults:
     class WxDiscountShare:
         best_luck: bool
         reentry: bool
-        user_count: int
+        user_list: list[PShareUser]
         discount: Optional[PDiscountRule]
         available: bool
 

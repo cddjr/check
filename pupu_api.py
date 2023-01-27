@@ -261,8 +261,8 @@ class Api(ApiBase):
                 # refresh_token 在临期时会更新 我们需要保存新的token 否则很快就得重新登录
                 prev_refresh_token = self.__refresh_token
                 self.__refresh_token = data.get(
-                    "refresh_token", self.__refresh_token)
-                self.__expires_in = int(data.get('expires_in', 0))
+                    "refresh_token") or self.__refresh_token
+                self.__expires_in = int(data.get('expires_in') or 0)
                 self._nickname = data.get("nick_name")
                 return ApiResults.TokenRefreshed(refresh_token=self.__refresh_token,
                                                  access_expires=self.__expires_in,
@@ -333,24 +333,22 @@ class Api(ApiBase):
                 info = None
                 for r in data:
                     # r["is_in_service"] 意味地址是否可以配送
-                    if r.get("is_default", False) or r.get("time_last_order", 0) > time_last_order:
-                        time_last_order = int(r.get("time_last_order", 0))
+                    if r.get("is_default") or int(r.get("time_last_order") or 0) > time_last_order:
+                        time_last_order = int(r.get("time_last_order") or 0)
                         place = r["place"]
                         info = PReceiverInfo(
                             id=str(r["id"]),
                             address=r["address"], room_num=r["building_room_num"],
-                            lng_x=place.get(
-                                "lng_x", r["lng_x"]),
-                            lat_y=place.get(
-                                "lat_y", r["lat_y"]),
+                            lng_x=place.get("lng_x") or r["lng_x"],
+                            lat_y=place.get("lat_y") or r["lat_y"],
                             receiver_name=r["name"], phone_number=r["mobile"],
                             store_id=place.get(
-                                "service_store_id", r["service_store_id"]),
+                                "service_store_id") or r["service_store_id"],
                             place_id=place["id"],
-                            city_zip=place.get("store_city_zip", 0)
+                            city_zip=place.get("store_city_zip") or 0
                         )
-                        self.user_id = r.get("user_id", self.user_id)
-                        info.place_zip = int(place.get("zip", info.city_zip))
+                        self.user_id = r.get("user_id") or self.user_id
+                        info.place_zip = int(place.get("zip") or info.city_zip)
 
                         building_name = None
                         room_num = r.get("room_num")
@@ -369,7 +367,7 @@ class Api(ApiBase):
                                 break
                             info = None  # 不符合筛选条件 需要置空
                             time_last_order = 0
-                        elif r.get("is_default", False):
+                        elif r.get("is_default"):
                             # 如果是默认地址则直接用(似乎朴朴并没有设置)
                             break
                 if not info:
@@ -434,8 +432,8 @@ class Api(ApiBase):
                 for item in data:
                     if "link_type" in item \
                             and BANNER_LINK_TYPE(item["link_type"]) == link_type:
-                        time_open = item.get("time_open", 0)
-                        time_close = item.get("time_close", now + 60_000)
+                        time_open = item.get("time_open") or 0
+                        time_close = item.get("time_close") or (now + 60_000)
                         if now < time_open or now + 60_000 > time_close:
                             # 不在效期内 忽略
                             continue
@@ -467,7 +465,7 @@ class Api(ApiBase):
                     name=data["activity_name"],  # 开运新年签
                     type=LOTTERY_TYPE(data["lottery_type"]),
                 )
-                for prize in data.get("prize_info", []):
+                for prize in data.get("prize_info") or []:
                     # 解析奖品
                     if "prize_level" in prize and "prize_type" in prize \
                             and "prize_name" in prize:
@@ -475,11 +473,10 @@ class Api(ApiBase):
                                    name=prize["prize_name"],
                                    type=RewardType(prize["prize_type"]))
                         lottery.prizes[p.level] = p
-                task_system_link = data.get("task_system_link", {})
+                task_system_link = data.get("task_system_link") or {}
                 lottery.task_system_link_id = task_system_link.get("link_id")
                 if lottery.task_system_link_id:
-                    link_type = BANNER_LINK_TYPE(
-                        task_system_link.get("link_type"))
+                    link_type = BANNER_LINK_TYPE(task_system_link["link_type"])
                     if link_type != BANNER_LINK_TYPE.USER_TASK:
                         print(f"警告: 抽奖任务遇到了不识别的link_type '{link_type.name}'")
                         lottery.task_system_link_id = None
@@ -497,7 +494,7 @@ class Api(ApiBase):
                 f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{lottery.id}/user_chances",
                 client=ClientType.kWeb)
             if obj["errcode"] == 0:
-                num = obj["data"].get("remain_chance_num", 0)
+                num = obj["data"].get("remain_chance_num") or 0
                 return ApiResults.UserLotteryInfo(remain_chances=num)
             else:
                 return ApiResults.Error(json=obj)
@@ -516,7 +513,7 @@ class Api(ApiBase):
                 client=ClientType.kWeb)
             if obj["errcode"] == 0:
                 data = obj["data"]
-                tasks_json: list = data.get("tasks", [])
+                tasks_json: list = data.get("tasks") or []
                 for task_json in tasks_json:
                     page_task_rule = task_json.get("page_task_rule")
                     if not page_task_rule:
@@ -578,15 +575,15 @@ class Api(ApiBase):
                 client=ClientType.kWeb)
             if obj["errcode"] == 0:
                 data = obj["data"]
-                coin_balance = int(data.get("coin_balance", 0))
+                coin_balance = int(data.get("coin_balance") or 0)
                 entrances: list[PChanceEntrance] = []
-                for item in data.get("chance_obtain_entrance", []):
+                for item in data.get("chance_obtain_entrance") or []:
                     if "code" in item and "attend_count" in item \
                             and "limit_count" in item and "gain_num" in item \
                             and "target_value" in item:
                         pitem = PChanceEntrance(
                             type=CHANCE_OBTAIN_TYPE(item["code"]),
-                            title=item.get("title", "未知"),
+                            title=item.get("title") or "未知",
                             attend_count=item["attend_count"],
                             limit_count=item["limit_count"],
                             target_value=int(item["target_value"]),
@@ -651,8 +648,8 @@ class Api(ApiBase):
                 data = obj["data"]
                 products = []
                 # 总共收藏了{total_count}件商品
-                total_count: int = data.get("count", 0)
-                for p in data.get("products", []):
+                total_count: int = data.get("count") or 0
+                for p in data.get("products") or []:
                     # TODO 若 p["sell_batches"] 不为空，则以该数组的最低价作为当前价格
                     product = PProduct(
                         name=p["name"],
@@ -660,20 +657,20 @@ class Api(ApiBase):
                         product_id=p["product_id"],
                         store_product_id=p["id"],
                         purchase_type=PURCHASE_TYPE(
-                            p.get("purchase_type", PURCHASE_TYPE.GENERAL)),
+                            p.get("purchase_type") or PURCHASE_TYPE.GENERAL),
                         spread_tag=SPREAD_TAG(
-                            p.get("spread_tag", SPREAD_TAG.NORMAL_PRODUCT)),
-                        stock_quantity=p.get("stock_quantity", 0),
-                        order_remarks=p.get("order_remarks", [])
+                            p.get("spread_tag") or SPREAD_TAG.NORMAL_PRODUCT),
+                        stock_quantity=p.get("stock_quantity") or 0,
+                        order_remarks=p.get("order_remarks") or [],
                     )
                     if product.spread_tag == SPREAD_TAG.FLASH_SALE_PRODUCT:
-                        flash_sale_info = p.get("flash_sale_info", {})
+                        flash_sale_info = p.get("flash_sale_info") or {}
                         progress_rate: float = flash_sale_info.get(
-                            "progress_rate", 0.0)
+                            "progress_rate") or 0.0
                         if flash_sale_info and progress_rate < 1.0:
                             # 限购N件
                             product.quantity_limit = flash_sale_info.get(
-                                "quantity_each_person_limit", 1)
+                                "quantity_each_person_limit") or 1
                     products.append(product)
                 return ApiResults.ProductCollections(total_count, products)
             else:
@@ -719,20 +716,20 @@ class Api(ApiBase):
                 ids = []
                 rules = []
                 data = obj["data"]
-                if data.get("count", 0) > 0:
-                    best_discount = data.get("best_discount", {})
+                if data.get("count"):
+                    best_discount = data.get("best_discount") or {}
                     id = best_discount.get("id")
-                    rule = best_discount.get("rule", {})
+                    rule = best_discount.get("rule") or {}
                     if id:
                         # 超时赔付券，券前金额满8减8元；
                         # content:None|str = rule.get("content")
                         ids.append(id)
                         rules.append(PDiscountRule(
-                            id=rule.get("discount_id", ""),
-                            type=DiscountType(rule.get("discount_type",
-                                                       DiscountType.ABSOLUTE)),
-                            condition_amount=rule.get("condition_amount", 0),
-                            discount_amount=rule.get("discount_amount", 0)))
+                            id=rule.get("discount_id") or "",
+                            type=DiscountType(
+                                rule.get("discount_type") or DiscountType.ABSOLUTE),
+                            condition_amount=rule.get("condition_amount") or 0,
+                            discount_amount=rule.get("discount_amount") or 0))
                 return ApiResults.UsableCoupons(coupons=ids, rules=rules)
             else:
                 return ApiResults.Error(json=obj)
@@ -765,7 +762,7 @@ class Api(ApiBase):
                 dtime_type = DeliveryTimeType.IMMEDIATE
                 data = obj["data"]
                 dtime_log = data["delivery_time_log"]
-                dtime_real = dtime_log.get("delivery_time_real", 30)
+                dtime_real = dtime_log.get("delivery_time_real") or 30
                 if "reason_type" in dtime_log:
                     reason_type = DeliveryReasonType(dtime_log["reason_type"])
                     if reason_type == DeliveryReasonType.FUTURE_PRODUCTS:
@@ -867,7 +864,7 @@ class Api(ApiBase):
             if obj["errcode"] == 0:
                 orders = []
                 # 总共{total_count}件订单
-                total_count: int = obj.get("count", 0)
+                total_count: int = obj.get("count") or 0
                 data = obj["data"]
                 for o in data:
                     order = POrder(
@@ -898,11 +895,11 @@ class Api(ApiBase):
             # ClientType.kMicroMsg
             if obj["errcode"] == 0:
                 data = obj["data"]
-                enabled: bool = data.get("enabled", True)
-                status = SHARE_STATUS(data.get('status', SHARE_STATUS.ERROR))
-                best_luck: bool = data.get("best_luck", False)  # 我是否最佳
+                enabled: bool = data.get("enabled") or True
+                status = SHARE_STATUS(data.get('status') or SHARE_STATUS.ERROR)
+                best_luck: bool = data.get("best_luck") or False  # 我是否最佳
                 reentry: bool = data["reentry"]  # 已领取过该优惠券了哦
-                rule = data.get("rule", {})  # 我抢到的优惠券 可能为空
+                rule = data.get("rule") or {}  # 我抢到的优惠券 可能为空
                 discount_id = rule.get("discount_id")
                 if not discount_id:
                     # 我没抢到优惠券
@@ -929,7 +926,7 @@ class Api(ApiBase):
                     name=item["name"],
                     best=item["max"],
                     time=item["time"],
-                ) for item in data.get("list", [])]
+                ) for item in data.get("list") or []]
                 return ApiResults.WxDiscountShare(
                     best_luck, reentry, users,
                     discount=discount_rule,
@@ -970,7 +967,7 @@ class Client(Api):
             self.refresh_token = self._refresh_token_user_specified
         else:
             self.refresh_token = self._config_dict.get(
-                "refresh_token_lastest", self._refresh_token_user_specified)
+                "refresh_token_lastest") or self._refresh_token_user_specified
 
         self.access_token = self._config_dict.get("access_token")
         self.expires_in = self._config_dict.get("access_expires")
@@ -978,11 +975,11 @@ class Client(Api):
         self.user_id = self._config_dict.get("user_id")
         self.su_id = self._config_dict.get("su_id")
         self.receiver = PReceiverInfo(
-            self._config_dict.get("recv_id", ""),
-            store_id=self._config_dict.get("store_id", ""),
-            place_id=self._config_dict.get("place_id", ""),
-            city_zip=int(self._config_dict.get("city_zip", 0)),
-            place_zip=int(self._config_dict.get("place_zip", 0)))
+            self._config_dict.get("recv_id") or "",
+            store_id=self._config_dict.get("store_id") or "",
+            place_id=self._config_dict.get("place_id") or "",
+            city_zip=int(self._config_dict.get("city_zip") or 0),
+            place_zip=int(self._config_dict.get("place_zip") or 0))
 
         self._nickname = self._config_dict.get("nickname")
         self._avatar = self._config_dict.get("avatar")

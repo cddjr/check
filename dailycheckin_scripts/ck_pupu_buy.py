@@ -76,6 +76,7 @@ class PUPU:
         """检测商品是否降价"""
         # TODO 多页
         collections = await api.GetProductCollections(page=1)
+        log(f'  当前服务器时间: {PClient.TryGetServerTime() or 0}')
         if isinstance(collections, ApiResults.Error):
             return collections
         msg: list[str] = []
@@ -88,13 +89,14 @@ class PUPU:
                     continue
                 if p.stock_quantity <= 0:
                     # 排除没货的
+                    log(f'  缺货: {p.name}')
                     continue
                 if p.sell_batches:
                     # TODO 以该数组的最低价作为当前价格
                     pass
                 if p.price > goods.price:
                     # 排除价格高于预期的
-                    # log(f'价格高于预期: {p.name} {p.price/100}元 > {goods.price/100}元')
+                    log(f'  价格高于预期: {p.name} {p.price/100}元 > {goods.price/100}元')
                     continue
                 log(f'检测到低价: {p.name} {p.price/100}元', msg)
                 price_reduction += 1
@@ -124,13 +126,13 @@ class PUPU:
             sub_msg, collections, price_reduction, order_items = results
             msg += sub_msg
             log(f'总共收藏了{collections.total_count}件商品')
-            log(f'当前服务器时间: {api.TryGetServerTime() or 0}')
             if price_reduction <= 0:
                 # 第1次检测没有降价 等待片刻
                 await asyncio.sleep(0.5)
                 # 开始第2次检测 总共3次
                 retry = 2
                 while (retry <= 3):
+                    log(f'第{retry}次尝试...')
                     _, results = await asyncio.gather(
                         asyncio.sleep(0.5),
                         self.DetectProducts(api))
@@ -141,12 +143,8 @@ class PUPU:
                     msg += sub_msg
                     if price_reduction > 0:
                         # 存在降价商品 不再尝试检测
-                        log(f'第{retry}次尝试发现降价')
-                        log(f'当前服务器时间: {api.TryGetServerTime() or 0}')
                         break
                     retry += 1
-            else:
-                log('第1次尝试发现降价')
             if order_items:
                 # 并行获得加购商品可用的优惠券和派送时间
                 coupons_result, dtime_result, now = await asyncio.gather(
@@ -175,10 +173,11 @@ class PUPU:
                     log(order_result, msg)
                 else:
                     log(f'订单创建成功 {order_result.id}', msg)
-                    log(f'当前服务器时间: {api.TryGetServerTime() or 0}')
+                    log(f'当前服务器时间: {PClient.TryGetServerTime() or 0}')
                     msg += await self.ServerJ("朴朴降价了", f"{order_result.id}")
             elif price_reduction <= 0:
                 log('无降价', msg)
+                log(f'当前服务器时间: {PClient.TryGetServerTime() or 0}')
         return msg
 
     def ParseGoods(self):

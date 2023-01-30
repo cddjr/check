@@ -115,7 +115,6 @@ class PUPU:
     def RecordPrice(self, p: PProduct):
         '''记录商品价格'''
         now = PClient.TryGetServerTime() or 0
-        self._database_drity = True
         history_record = self._history.get(
             p.store_product_id) or ProductHistory()
 
@@ -134,16 +133,20 @@ class PUPU:
                 continue
             if t:
                 setattr(history_record, t, record)
-            else:
-                setattr(history_record, f, None)
+            setattr(history_record, f, None)
+            self._database_drity = True
 
         record = history_record.d3 or PriceRecord(now,
                                                   low=p.price, high=p.price)
         if p.price < record.low:
             record.low = p.price
+            self._database_drity = True
         elif p.price > record.high:
             record.high = p.price
-        history_record.d3 = record
+            self._database_drity = True
+        elif history_record.d3 is None:
+            history_record.d3 = record
+            self._database_drity = True
 
         self._history[p.store_product_id] = history_record
 

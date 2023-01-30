@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 30 9,23 4-30 1/2 *
+cron: 38 9,23 4-30 1/2 *
 new Env('朴朴集卡');
 
 微信登录朴朴app
@@ -111,9 +111,9 @@ class PUPU:
                 log(remain_chances, msg)
                 remain_chances = 0
             elif remain_chances <= 0:
-                log(' 没有抽卡次数', msg)
+                log(' 没有抽卡机会', msg)
             else:
-                log(f' 当前有{remain_chances}次抽卡次数', msg)
+                log(f' 当前有{remain_chances}次抽卡机会', msg)
 
             # 开始抽卡
             for i in range(remain_chances):
@@ -134,7 +134,7 @@ class PUPU:
                 return msg
             else:
                 for card in info.already_get:
-                    log(f' {card.name}: {card.have_count}张', msg)
+                    log(f' {card.name}: {card.have_count}张')
                 log(
                     f' 可合成{info.can_composite_count}张 {info.already_get[0].name}', msg)
                 if info.can_composite_count:

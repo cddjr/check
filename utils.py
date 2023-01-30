@@ -290,6 +290,8 @@ class check(object):
                     try:
                         result = func(value=value) + '\n\n'
                         # print(f"执行结果:\n{result}")
+                        if result:
+                            result = "***\n" + result
                         push_message += result
                     except IndexError:
                         print("可能是示例格式被运行\n错误信息:")

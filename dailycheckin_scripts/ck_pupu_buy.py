@@ -306,7 +306,7 @@ class PUPU:
                 log(f'当前服务器时间: {PClient.TryGetServerTime() or 0}')
             # 输出商品的历史价格
             msg.append("***")
-            log('历史价格:', msg)
+            log(f'历史价格: {"有变化!" if self._database_drity else "无变化"}', msg)
             for p in collections.products:
                 msg += self.OutputHistoryPrice(p)
         return msg

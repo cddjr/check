@@ -112,7 +112,6 @@ class PUPU:
         self._database_drity = False
         self._history = json_codec.decode(self._database.get_value_2("history") or {} if self._database else {},
                                           dict[str, ProductHistory])
-        pass
 
     def RecordPrice(self, p: PProduct):
         '''记录商品价格'''
@@ -163,9 +162,9 @@ class PUPU:
         if not history_record:
             # 无记录
             return msg
-        log(f"{p.name}:", msg)
-        log(f"    历史低价: {history_record.d3_low}, {history_record.d7_low}, {history_record.d15_low}, {history_record.d30_low}", msg)
-        log(f"    历史高价: {history_record.d3_high}, {history_record.d7_high}, {history_record.d15_high}, {history_record.d30_high}", msg)
+        log(f"- {p.name}:  ", msg)
+        log(f"  历史低价: {history_record.d3_low}, {history_record.d7_low}, {history_record.d15_low}, {history_record.d30_low}  ", msg)
+        log(f"  历史高价: {history_record.d3_high}, {history_record.d7_high}, {history_record.d15_high}, {history_record.d30_high}  ", msg)
         return msg
 
     async def main(self):
@@ -304,6 +303,8 @@ class PUPU:
                 log('无降价', msg)
                 log(f'当前服务器时间: {PClient.TryGetServerTime() or 0}')
             # 输出商品的历史价格
+            msg.append("***")
+            log('历史价格:', msg)
             for p in collections.products:
                 msg += self.OutputHistoryPrice(p)
         return msg

@@ -153,7 +153,7 @@ class config_get(object):
             if self.config_format == "toml":
                 return self.set_value_for_toml(self.config_file, key, value)
             else:
-                raise NotImplementedError
+                return self.set_value_for_json(self.config_file, key, value)
 
     @staticmethod
     def move_configuration_file_old():
@@ -207,6 +207,31 @@ class config_get(object):
                 tomli_w.dump(toml_dict, f)
         except:
             print(f"修改配置文件 {toml_path} 失败\n{traceback.format_exc()}")
+
+    @staticmethod
+    def set_value_for_json(json_path, key: str, value: Any):
+        try:
+            with open(json_path, "r", encoding="utf8") as f:
+                try:
+                    json_dict = json.load(f)
+                except json.decoder.JSONDecodeError:
+                    print(
+                        f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}")
+                    json_dict = {}
+        except OSError:
+            json_dict = {}
+        if isinstance(value, dict):
+            if key not in json_dict:
+                json_dict[key] = value
+            else:
+                json_dict[key].update(value)
+        else:
+            json_dict[key] = value
+        try:
+            with open(json_path, "w", encoding="utf8") as f:
+                json.dump(json_dict, f, ensure_ascii=False, indent=2)
+        except:
+            print(f"修改配置文件 {json_path} 失败\n{traceback.format_exc()}")
 
     @staticmethod
     def get_value_for_json(json_path, key):
@@ -398,7 +423,7 @@ def log(s: object, msg_list: Optional[list[str]] = None):
 
 def GetScriptConfig(filename: str):
     """
-    获得当前脚本对应的配置文件
+    获得当前脚本对应的数据库
     """
     try:
         dirname = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -408,8 +433,10 @@ def GetScriptConfig(filename: str):
         except OSError:
             if not os.path.isdir(cache_dir):
                 raise
-        config = config_get(os.path.join(cache_dir, f"{filename}.toml"))
-        # config.set_value("Version", 1)
+        if filename.endswith(".json"):
+            config = config_get(os.path.join(cache_dir, filename))
+        else:
+            config = config_get(os.path.join(cache_dir, f"{filename}.toml"))
         return config
     except:
         print(traceback.format_exc())

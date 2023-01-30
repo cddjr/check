@@ -18,13 +18,14 @@ push_key 降价时用的ServerJ推送key(可选)
 import asyncio
 import sys
 from traceback import format_exc
-from typing import Optional  # 确保兼容<=Python3.9
+from typing import Optional, cast  # 确保兼容<=Python3.9
 
+import json_codec
 from aiohttp import ClientSession, ClientTimeout
 
 from pupu_api import Client as PClient
 from pupu_types import *
-from utils import check, log
+from utils import GetScriptConfig, check, log
 
 assert sys.version_info >= (3, 9)
 
@@ -36,6 +37,62 @@ class Goods:
     quantity: int
 
 
+@dataclass
+class PriceRecord:
+    create_time: int
+    low: int
+    high: int
+
+
+@dataclass
+class ProductHistory:
+    time: int
+    d3: Optional[PriceRecord] = None
+    d7: Optional[PriceRecord] = None
+    d15: Optional[PriceRecord] = None
+    d30: Optional[PriceRecord] = None
+
+    @property
+    def d3_low(self) -> str:
+        return f'{self.d3.low/100}元' if self.d3 else "-"
+
+    @property
+    def d7_low(self) -> str:
+        return f'{self.d7.low/100}元' if self.d7 else "-"
+
+    @property
+    def d15_low(self) -> str:
+        return f'{self.d15.low/100}元' if self.d15 else "-"
+
+    @property
+    def d30_low(self) -> str:
+        return f'{self.d30.low/100}元' if self.d30 else "-"
+
+    @property
+    def d3_high(self) -> str:
+        return f'{self.d3.high/100}元' if self.d3 else "-"
+
+    @property
+    def d7_high(self) -> str:
+        return f'{self.d7.high/100}元' if self.d7 else "-"
+
+    @property
+    def d15_high(self) -> str:
+        return f'{self.d15.high/100}元' if self.d15 else "-"
+
+    @property
+    def d30_high(self) -> str:
+        return f'{self.d30.high/100}元' if self.d30 else "-"
+
+
+class Days(IntEnum):
+    DAY = 24 * 3600 * 1000
+    DAYS_3 = 3 * DAY
+    DAYS_7 = 7 * DAY
+    DAYS_15 = 15 * DAY
+    DAYS_30 = 30 * DAY
+
+
 class PUPU:
 
     __slots__ = ("check_item",
@@ -44,10 +101,72 @@ class PUPU:
                  "_goods",
                  "_buy",
                  "_push_key",
+                 "_database",
+                 "_history",
+                 "_database_drity",
                  )
 
     def __init__(self, check_item) -> None:
         self.check_item: dict = check_item
+        self._database = GetScriptConfig("pupu_buy.json")
+        self._database_drity = False
+        self._history = json_codec.decode(self._database.get_value_2("history") or {} if self._database else {},
+                                          dict[str, ProductHistory])
+        pass
+
+    def RecordPrice(self, p: PProduct):
+        '''记录商品价格'''
+        self._database_drity = True
+        history_record = self._history.get(
+            p.store_product_id) or ProductHistory(time=0)
+        history_record.time = PClient.TryGetServerTime() or 0
+
+        # d30如果距今超过30天则移除
+        # d7如果距今超过7天则移动至d15
+        STAGES: list = [("d30", Days.DAYS_30, None), ("d15", Days.DAYS_15, "d30"),
+                        ("d7", Days.DAYS_7, "d15"), ("d3", Days.DAYS_3, "d7")]
+
+        # 根据历史价格的最后更新日期进行重新归类
+        for f, c, t in STAGES:
+            record = cast(Optional[PriceRecord],
+                          getattr(history_record, f, None))
+            if record is None:
+                continue
+            if history_record.time - record.create_time < c:
+                continue
+            if t:
+                setattr(history_record, t, record)
+            else:
+                setattr(history_record, f, None)
+
+        record = history_record.d3 or PriceRecord(history_record.time,
+                                                  low=p.price, high=p.price)
+        if p.price < record.low:
+            record.low = p.price
+        elif p.price > record.high:
+            record.high = p.price
+        history_record.d3 = record
+
+        self._history[p.store_product_id] = history_record
+
+    def OutputHistoryPrice(self, p: PProduct):
+        '''
+        打印商品的历史价格详情
+
+        ---
+        有机番茄:
+            历史低价: 7.00, 15.00, 10.00, 1.00
+            历史高价: 15.00, 15.00, 16.00, 16.00
+        '''
+        msg: list[str] = []
+        history_record = self._history.get(p.store_product_id)
+        if not history_record:
+            # 无记录
+            return msg
+        log(f"{p.name}:", msg)
+        log(f"    历史低价: {history_record.d3_low}, {history_record.d7_low}, {history_record.d15_low}, {history_record.d30_low}", msg)
+        log(f"    历史高价: {history_record.d3_high}, {history_record.d7_high}, {history_record.d15_high}, {history_record.d30_high}", msg)
+        return msg
 
     async def main(self):
         msg: list[str] = []
@@ -68,6 +187,10 @@ class PUPU:
                 raise SystemExit("没有配置需要检测的商品 跳过")
 
             msg += await self.Entry()
+
+            if self._database and self._database_drity:
+                self._database.set_value("history",
+                                         json_codec.encode(self._history))
         except Exception:
             log(f'失败: 请检查接口 {format_exc()}', msg)
         return "\n".join(msg)
@@ -83,6 +206,8 @@ class PUPU:
         price_reduction = 0
         order_items: list[PProduct] = []
         for p in collections.products:
+            # 记录价格
+            self.RecordPrice(p)
             for goods in self._goods:
                 if p.name.find(goods.keyword) == -1:
                     # 排除不关心价格的
@@ -96,9 +221,9 @@ class PUPU:
                     pass
                 if p.price > goods.price:
                     # 排除价格高于预期的
-                    log(f'  价格高于预期: {p.name} {p.price/100}元 > {goods.price/100}元')
+                    # log(f'  价格高于预期: {p.name} {p.price/100}元 > {goods.price/100}元')
                     continue
-                log(f'检测到低价: {p.name} {p.price/100}元', msg)
+                log(f'价格低于预期: {p.name} {p.price/100}元', msg)
                 price_reduction += 1
                 if not self._buy or goods.quantity <= 0:
                     continue
@@ -178,6 +303,9 @@ class PUPU:
             elif price_reduction <= 0:
                 log('无降价', msg)
                 log(f'当前服务器时间: {PClient.TryGetServerTime() or 0}')
+            # 输出商品的历史价格
+            for p in collections.products:
+                msg += self.OutputHistoryPrice(p)
         return msg
 
     def ParseGoods(self):

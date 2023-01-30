@@ -150,6 +150,12 @@ class SHARE_STATUS(MyIntEnum):
     NORMAL = 4
 
 
+class COLLECT_CARD_STATUS(MyIntEnum):
+    NOT_START = 10
+    PROCESSING = 20
+    FINISHED = 30
+
+
 class ERROR_CODE(MyIntEnum):
     CODE_SUCCESS = 0
 
@@ -183,6 +189,41 @@ class ERROR_CODE(MyIntEnum):
     ERROR_TASK_DOES_NOT_EXIST = 400106
 
     CODE_PRODUCT_UPDATE = 500001
+
+
+@dataclass
+class PCollectCardRule:
+    id: str
+    name: str
+    time_start: int
+    time_end: int
+    status: COLLECT_CARD_STATUS
+    send_status: int
+    enabled: bool
+    open_card_lottery: bool
+    card_lottery_activity_id: str
+    card_get_task_id: str
+
+
+@dataclass
+class PCollectCard:
+    card_type: int  # TODO 10普通卡 20合成卡
+    link_type: BANNER_LINK_TYPE
+    name: str
+    rule_id: str
+    sort_num: int
+
+    # 以下字段仅在获取卡列表时有效
+    rule_card_id: Optional[str] = None
+    owner_user_id: Optional[str] = None
+    have_count: Optional[int] = None
+
+
+@dataclass
+class PCollectCardEntity:
+    already_get: list[PCollectCard]
+    can_composite_count: int
+    first_visit: bool
 
 
 @dataclass
@@ -455,6 +496,7 @@ class HttpMethod(Enum):
     kPut = "PUT"
     kGet = "GET"
     kPost = "POST"
+    kDelete = "DELETE"
 
 
 class ClientType(IntEnum):

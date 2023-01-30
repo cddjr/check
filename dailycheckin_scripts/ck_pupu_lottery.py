@@ -116,7 +116,7 @@ class PUPU:
                     # 每个任务至少间隔2~5秒的时间
                     _, task_result = await asyncio.gather(
                         aio_randomSleep(2, 5),
-                        api.PostPageTaskComplete(info.lottery, task))
+                        api.PostPageTaskComplete(task))
                     if isinstance(task_result, ApiResults.Error):
                         log(task_result)
                     else:

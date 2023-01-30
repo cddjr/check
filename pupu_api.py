@@ -5,6 +5,7 @@ from sys import version_info as py_version
 from time import time
 from typing import Any, Optional, Union  # 确保兼容<=Python3.9
 
+import json_codec
 from aiohttp_retry import JitterRetry, RetryClient
 
 from pupu_types import *
@@ -501,15 +502,17 @@ class Api(ApiBase):
         except Exception:
             return ApiResults.Exception()
 
-    async def GetTaskGroupsData(self, lottery: PLotteryInfo):
+    async def GetTaskGroupsData(self, lottery: Union[PLotteryInfo, PCollectCardRule]):
         """获取任务列表"""
-        if not lottery.task_system_link_id:
+        task_id = lottery.task_system_link_id if isinstance(
+            lottery, PLotteryInfo) else lottery.card_get_task_id
+        if not task_id:
             return ApiResults.TaskGroupsData([])
         try:
             tasks: list[PTask] = []
             obj = await self._SendRequest(
                 HttpMethod.kGet,
-                f"https://j1.pupuapi.com/client/game/task_system/user_tasks/task_groups/{lottery.task_system_link_id}",
+                f"https://j1.pupuapi.com/client/game/task_system/user_tasks/task_groups/{task_id}",
                 client=ClientType.kWeb)
             if obj["errcode"] == 0:
                 data = obj["data"]
@@ -521,7 +524,8 @@ class Api(ApiBase):
                         continue
                     if "task_status" not in page_task_rule:
                         continue
-                    assert page_task_rule["action_type"] == ActionTYPE.BROWSE.value
+                    # if page_task_rule["action_type"] != ActionTYPE.BROWSE:
+                    #    continue
                     tasks.append(PTask(
                         task_name=task_json["task_name"],
                         task_id=page_task_rule["task_id"],
@@ -540,7 +544,7 @@ class Api(ApiBase):
         except Exception:
             return ApiResults.Exception()
 
-    async def PostPageTaskComplete(self, lottery: PLotteryInfo, task: PTask):
+    async def PostPageTaskComplete(self, task: PTask):
         """完成浏览任务"""
         # 此任务从何时完成
         time_end: int = await self.GetServerTime() - randint(1, 8) * 1000
@@ -931,6 +935,99 @@ class Api(ApiBase):
                     best_luck, reentry, users,
                     discount=discount_rule,
                     available=status == SHARE_STATUS.NORMAL and enabled)
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def GetCollectCardRule(self):
+        """获得抽卡规则"""
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kGet,
+                "https://j1.pupuapi.com/client/game/collect_card/current_rule",
+                ClientType.kWeb,
+            )
+            if obj["errcode"] == 0:
+                return json_codec.decode(obj["data"], PCollectCardRule)
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def GetCollectCardLotteryCount(self, rule: PCollectCardRule):
+        """获得抽卡次数"""
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kGet,
+                f"https://j1.pupuapi.com/client/game/collect_card/rule/{rule.id}/lottery_count",
+                ClientType.kWeb,
+            )
+            if obj["errcode"] == 0:
+                return int(obj["data"])
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def GetCollectCardEntity(self, rule: PCollectCardRule):
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kGet,
+                f"https://j1.pupuapi.com/client/game/collect_card/rule/{rule.id}/card_entity",
+                ClientType.kWeb,
+            )
+            if obj["errcode"] == 0:
+                return json_codec.decode(obj["data"], PCollectCardEntity)
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def LotteryGetCard(self, rule: PCollectCardRule):
+        '''抽卡'''
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kGet,
+                f"https://j1.pupuapi.com/client/game/collect_card/rule/{rule.id}/lottery_get_card",
+                ClientType.kWeb,
+            )
+            if obj["errcode"] == 0:
+                return json_codec.decode(obj["data"], PCollectCard)
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def PostCompositeCard(self, rule: PCollectCardRule):
+        '''合成卡片'''
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kPost,
+                f"https://j1.pupuapi.com/client/game/collect_card/rule/{rule.id}/composite",
+                ClientType.kWeb,
+            )
+            if obj["errcode"] == 0:
+                # TODO
+                log(obj["data"])
+                return obj["data"]
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def DeleteExpendCardEntity(self, card: PCollectCard):
+        '''消耗卡片兑换抽奖机会'''
+        try:
+            assert card.rule_card_id
+            obj = await self._SendRequest(
+                HttpMethod.kDelete,
+                f"https://j1.pupuapi.com/client/game/collect_card/rule_card/{card.rule_card_id}",
+                ClientType.kWeb,
+            )
+            if obj["errcode"] == 0:
+                # 返回抽奖活动id
+                return str(obj["data"])
             else:
                 return ApiResults.Error(json=obj)
         except Exception:

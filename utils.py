@@ -378,13 +378,13 @@ def change_cron_old(cron_file_path="/ql/db/crontab.db", repositories="cddjr_chec
 
 def randomSleep(min=1, max=6):
     interval = random.randint(min, max)
-    print(f"随机等待{interval}秒...")
+    # print(f"随机等待{interval}秒...")
     time.sleep(interval)
 
 
 async def aio_randomSleep(min=1, max=6):
     interval = random.randint(min, max)
-    print(f"随机等待{interval}秒...")
+    # print(f"随机等待{interval}秒...")
     await aio_sleep(interval)
 
 

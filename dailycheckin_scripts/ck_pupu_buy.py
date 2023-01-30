@@ -46,7 +46,6 @@ class PriceRecord:
 
 @dataclass
 class ProductHistory:
-    time: int
     d3: Optional[PriceRecord] = None
     d7: Optional[PriceRecord] = None
     d15: Optional[PriceRecord] = None
@@ -115,10 +114,10 @@ class PUPU:
 
     def RecordPrice(self, p: PProduct):
         '''记录商品价格'''
+        now = PClient.TryGetServerTime() or 0
         self._database_drity = True
         history_record = self._history.get(
-            p.store_product_id) or ProductHistory(time=0)
-        history_record.time = PClient.TryGetServerTime() or 0
+            p.store_product_id) or ProductHistory()
 
         # d30如果距今超过30天则移除
         # d7如果距今超过7天则移动至d15
@@ -131,14 +130,14 @@ class PUPU:
                           getattr(history_record, f, None))
             if record is None:
                 continue
-            if history_record.time - record.create_time < c:
+            if now - record.create_time < c:
                 continue
             if t:
                 setattr(history_record, t, record)
             else:
                 setattr(history_record, f, None)
 
-        record = history_record.d3 or PriceRecord(history_record.time,
+        record = history_record.d3 or PriceRecord(now,
                                                   low=p.price, high=p.price)
         if p.price < record.low:
             record.low = p.price

@@ -12,6 +12,7 @@ enabled 是否启用(默认true, 多个账号复用一个数据库)
 import asyncio
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from enum import IntEnum
 from traceback import format_exc
 from typing import Optional, cast  # 确保兼容<=Python3.9
@@ -41,10 +42,13 @@ class PriceRecord:
     create_time: int
     low: int
     high: int
+    # 价格波动发生在何时
+    update_time: Optional[int] = None
 
 
 @dataclass
 class ProductHistory:
+    viewed: bool = False
     d3: Optional[PriceRecord] = None
     d7: Optional[PriceRecord] = None
     d15: Optional[PriceRecord] = None
@@ -150,13 +154,15 @@ def RecordPrice(p: PProduct) -> bool:
         setattr(history_record, f, None)
         dirty = True
 
-    record = history_record.d3 or PriceRecord(now,
+    record = history_record.d3 or PriceRecord(create_time=now,
                                               low=p.price, high=p.price)
     if p.price < record.low:
         record.low = p.price
+        record.update_time = now
         dirty = True
     elif p.price > record.high:
         record.high = p.price
+        record.update_time = now
         dirty = True
     elif history_record.d3 is None:
         history_record.d3 = record
@@ -164,8 +170,9 @@ def RecordPrice(p: PProduct) -> bool:
 
     _history[p.store_product_id] = history_record
     if dirty:
+        history_record.viewed = False
         _database_dirty = dirty
-    return dirty
+    return not history_record.viewed
 
 
 def OutputHistoryPrice(p: PProduct) -> list[str]:
@@ -177,15 +184,22 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
         历史低价: 7.00, 15.00, 10.00, 1.00
         历史高价: 15.00, 15.00, 16.00, 16.00
     '''
-    global _database, _history
+    global _database, _history, _database_dirty
     msg: list[str] = []
-    history_record = _history.get(p.store_product_id)
+    history_record = cast(Optional[ProductHistory],
+                          _history.get(p.store_product_id))
     if not history_record:
         # 无记录
         return msg
     log(f"- {p.name}: 当前{p.price/100}元  ", msg)
     log(f"  历史低价: {history_record.d3_low}, {history_record.d7_low}, {history_record.d15_low}, {history_record.d30_low}  ", msg)
     log(f"  历史高价: {history_record.d3_high}, {history_record.d7_high}, {history_record.d15_high}, {history_record.d30_high}  ", msg)
+    if time := history_record.d3.update_time if history_record.d3 else None:
+        d = datetime.fromtimestamp(time / 1000).strftime("%Y-%m-%d %H:%M:%S")
+        log(f"  变动时间: {d}", msg)
+    if not history_record.viewed:
+        history_record.viewed = True
+        _database_dirty = True
     return msg
 
 

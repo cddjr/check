@@ -25,6 +25,7 @@ class ClientApi(ABC):
         self.token = ""
         self.cron: List[Dict] = []
         self.excluded: List[str] = []
+        self.required: List[str] = []
 
     def init_cron(self):
         raise NotImplementedError
@@ -51,13 +52,14 @@ class ClientApi(ABC):
         return str(randrange(0, 23))
 
     def random_time(self, origin_time: str, command: str):
-        for keyword in self.excluded:
-            if command.find(keyword) != -1:
-                # 排除黑名单
+        if not any(kw in command for kw in self.required):
+            # 不是必须随机的任务
+            if any(kw in command for kw in self.excluded):
+                # 在黑名单中
                 return origin_time
-        if command.find("ran_time") != -1 or command.find(" now") != -1:
-            # 排除自身或者明确定义了now参数的任务
-            return origin_time
+            if command.find("ran_time") != -1 or command.find(" now") != -1:
+                # 排除自身或者明确定义了now参数的任务
+                return origin_time
         if command.find("rssbot") != -1 or command.find("hax") != -1:
             return ClientApi.get_ran_min() + " " + " ".join(origin_time.split(" ")[1:])
         if command.find("api") != -1:
@@ -86,12 +88,13 @@ class QLClient(ClientApi):
             or not (sct := client_info.get("client_secret"))
             or not (keywords := client_info.get("keywords"))
         ):
-            raise ValueError("无法获取 client 相关参数！")
+            raise ValueError("无法获取 client 相关参数")
         else:
             self.cid = cid
             self.sct = sct
             self.keywords = keywords
         self.excluded = client_info.get("excluded", [])
+        self.required = client_info.get("required", [])
         self.url = client_info.get("url", self.url).rstrip("/") + "/"
         self.twice = client_info.get("twice", False)
         self.token = requests.get(
@@ -99,7 +102,7 @@ class QLClient(ClientApi):
             params={"client_id": self.cid, "client_secret": self.sct},
         ).json()["data"]["token"]
         if not self.token:
-            raise ValueError("无法获取 token！")
+            raise ValueError("无法获取 token")
 
     def init_cron(self):
         data = requests.get(
@@ -138,11 +141,11 @@ def main(*args, **kwargs):
     msg = []
     try:
         QLClient(client_info=kwargs.get("value", {})).run()
-        log("处于启动状态的任务定时修改成功！", msg)
+        log("处于启动状态的任务定时修改成功", msg)
     except ValueError as e:
-        log(f"配置错误，{e},请检查你的配置文件！", msg)
+        log(f"配置错误，{e},请检查你的配置文件", msg)
     except AttributeError:
-        log("你的系统不支持运行随机定时！", msg)
+        log("你的系统不支持运行随机定时", msg)
     return "\n".join(msg)
 
 

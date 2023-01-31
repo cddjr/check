@@ -313,11 +313,9 @@ class check(object):
                         username = str(value)[:32] + "..."
                     print(f"获取到的账号信息为:{username}\n")
                     try:
-                        result = func(value=value) + '\n\n'
-                        # print(f"执行结果:\n{result}")
+                        result = func(value=value)
                         if result:
-                            result = "***\n" + result
-                        push_message += result
+                            push_message += f"***\n{result}\n\n"
                     except IndexError:
                         print("可能是示例格式被运行\n错误信息:")
                         print(f"{traceback.format_exc()}")

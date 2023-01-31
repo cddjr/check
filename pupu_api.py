@@ -639,14 +639,14 @@ class Api(ApiBase):
         except Exception:
             return ApiResults.Exception()
 
-    async def GetProductCollections(self, page: int):
+    async def GetProductCollections(self, page: int, page_size: int = 10):
         """获取商品收藏列表"""
         assert not self.receiver.id_empty
         try:
             obj = await self._SendRequest(
                 HttpMethod.kGet,
                 f"https://j1.pupuapi.com/client/user_behavior/product_collection/store/{self.receiver.store_id}/products",
-                params={"page": page, "size": 10}
+                params={"page": page, "size": page_size}
             )
             if obj["errcode"] == 0:
                 data = obj["data"]

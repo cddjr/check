@@ -232,6 +232,7 @@ async def __RecordCollectionsPrice(check_item):
                 page += 1
 
             if changed_msg:
+                log(f'账号: {api.nickname}', msg)
                 log("以下商品价格有变化:", msg)
                 msg.extend(changed_msg)
 

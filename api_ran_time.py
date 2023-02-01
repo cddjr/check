@@ -60,22 +60,26 @@ class ClientApi(ABC):
             if command.find("ran_time") != -1 or command.find(" now") != -1:
                 # 排除自身或者明确定义了now参数的任务
                 return origin_time
+        time = origin_time.split(" ")
+        # 兼容带秒的定时
+        ofst_hour = 1 if len(time) <= 5 else 2
+        ofst_day = 2 if len(time) <= 5 else 3
         if command.find("rssbot") != -1 or command.find("hax") != -1:
-            return ClientApi.get_ran_min() + " " + " ".join(origin_time.split(" ")[1:])
+            return ClientApi.get_ran_min() + " " + " ".join(time[ofst_hour:])
         if command.find("api") != -1:
             return (
                 ClientApi.get_ran_min()
                 + " "
                 + self.get_ran_hour(True)
                 + " "
-                + " ".join(origin_time.split(" ")[2:])
+                + " ".join(time[ofst_day:])
             )
         return (
             ClientApi.get_ran_min()
             + " "
             + self.get_ran_hour()
             + " "
-            + " ".join(origin_time.split(" ")[2:])
+            + " ".join(time[ofst_day:])
         )
 
 

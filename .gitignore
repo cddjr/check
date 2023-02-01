@@ -8,3 +8,5 @@ __pycache__/
 *.toml.lock
 
 check.toml
+
+*.log

@@ -220,6 +220,8 @@ async def __RecordCollectionsPrice(check_item):
         async with PClient(device_id, refresh_token) as api:
             result = await api.InitializeToken(check_item.get("addr_filter"), force_update_receiver=False)
             if isinstance(result, ApiResults.Error):
+                if api.nickname:
+                    log(f'账号: {api.nickname}', msg)
                 log(result, msg)
                 raise StopIteration
 

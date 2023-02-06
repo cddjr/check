@@ -63,6 +63,8 @@ class PUPU:
             result = await api.InitializeToken(self.check_item.get("addr_filter"),
                                                force_update_receiver=False)
             if isinstance(result, ApiResults.Error):
+                if api.nickname:
+                    log(f'账号: {api.nickname}', msg)
                 log(result, msg)
                 return msg
 

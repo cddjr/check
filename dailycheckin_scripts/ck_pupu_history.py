@@ -49,6 +49,7 @@ class PriceRecord:
 @dataclass
 class ProductHistory:
     viewed: bool = False
+    name: Optional[str] = None
     d3: Optional[PriceRecord] = None
     d7: Optional[PriceRecord] = None
     d15: Optional[PriceRecord] = None
@@ -135,6 +136,11 @@ def RecordPrice(p: PProduct) -> bool:
     now = PClient.TryGetServerTime() or 0
     history_record = _history.get(
         p.store_product_id) or ProductHistory()
+
+    if history_record.name is None or history_record.name != p.name:
+        # 230208: 商品名称也需要记录 方便调试
+        history_record.name = p.name
+        dirty = True
 
     # d30如果距今超过30天则移除
     # d7如果距今超过7天则移动至d15

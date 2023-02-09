@@ -369,9 +369,9 @@ class TOWN:
                     if await self.SignIn():
                         tasks.signInModel.signed = True
                         tasks.signInModel.signedDays += 1
-                        log(f"签到成功，已签{tasks.signInModel.signedDays}天", msg)
+                        log(f"签到成功: 已签{tasks.signInModel.signedDays}天", msg)
                 else:
-                    log(f"重复签到，已签{tasks.signInModel.signedDays}天", msg)
+                    log(f"重复签到: 已签{tasks.signInModel.signedDays}天", msg)
                 for task in tasks.taskInfoDTOS:
                     if task.taskCategory != TownTaskCategory.ANSWER:
                         # TODO 其它任务待研究
@@ -393,7 +393,7 @@ class TOWN:
                             print(answer.answer)
                             if r := await self.AnswerQuestion(q, answer):
                                 if r.result:
-                                    print(f"答对了，奖励:{r.rewardValue}盒花")
+                                    print(f"答对了，奖励: {r.rewardValue}盒花")
                                 await aio_randomSleep(min=0.5, max=1.0)
                                 if r.more:
                                     # 拉取下一题
@@ -409,34 +409,30 @@ class TOWN:
                 for lotus in info.lotusModels:
                     if not lotus.valid:
                         continue
-                    log(f"可领取: [{lotus.title}]{lotus.point}盒花")
                     await aio_randomSleep(min=2, max=4)
                     if result := await self.PickupLotus(lotus):
                         info.balance = result.model.balance
-                        log(f"成功领取了[{lotus.title}]{lotus.point}盒花", msg)
+                        log(f"成功领取: [{lotus.title}]{lotus.point}盒花", msg)
                 if bottle := info.retentionBottleModel:
                     if bottle.valid:
                         # 可以领取
-                        log(f"可领取: {bottle.point}盒花")
                         await aio_randomSleep(min=2, max=4)
                         if result := await self.PickupBottle(bottle):
                             info = result
-                            log(f"成功领取了{bottle.point}盒花", msg)
+                            log(f"成功领取: {bottle.point}盒花", msg)
                     else:
                         log(f"{bottle.title}: {bottle.point}盒花")
                     if count_down := bottle.countDownTaskModel:
                         if count_down.valid:
                             # 可以领取
-                            log(f"可领取: {count_down.rewardTarget}盒花")
                             await aio_randomSleep(min=2, max=4)
                             if result := await self.ComputeTaskAndReward(count_down):
                                 point = sum(
                                     r.rewardValue for r in result.generalRewardModels)
-                                log(f"成功领取了{point}盒花", msg)
+                                log(f"成功领取: {point}盒花", msg)
                         else:
                             log(f"还需等待{count_down.countDownTime}秒才能领取{count_down.rewardTarget}盒花")
 
-                log(f"当前盒花: {info.balance}", msg)
                 # 喂养、浇水 等...
                 if not info.cropInfoModels:
                     log("解析错误: 没有配置cropInfoModels", msg)
@@ -457,9 +453,10 @@ class TOWN:
                         info.balance = result.balance
                         info.cropInfoModels[0] = result.cropInfoModel
                         retentionBottleModel = result.retentionBottleModel
-                        log(f" 操作成功: 总进度{crop.totalPercentage}")
+                        log(f"操作成功: 当前进度{crop.totalPercentage}", msg)
                     else:
                         break
+                log(f"盒花: {info.balance}", msg)
                 log(f"进度: {crop.totalPercentage}", msg)
                 log(f"等级: {crop.currentLevel}", msg)
                 log(crop.progressDesc, msg)
@@ -467,22 +464,20 @@ class TOWN:
                 if bottle := retentionBottleModel:
                     if bottle.valid:
                         # 可以领取
-                        log(f"可领取: {bottle.point}")
                         await aio_randomSleep(min=2, max=4)
                         if result := await self.PickupBottle(bottle):
                             info = result
-                            log(f"成功领取了{bottle.point}盒花", msg)
+                            log(f"成功领取: {bottle.point}盒花", msg)
                     else:
                         log(f"{bottle.title}: {bottle.point}盒花")
                     if count_down := bottle.countDownTaskModel:
                         if count_down.valid:
                             # 可以领取
-                            log(f"可领取: {count_down.rewardTarget}盒花")
                             await aio_randomSleep(min=2, max=4)
                             if result := await self.ComputeTaskAndReward(count_down):
                                 point = sum(
                                     r.rewardValue for r in result.generalRewardModels)
-                                log(f"成功领取了{point}盒花", msg)
+                                log(f"成功领取: {point}盒花", msg)
                         else:
                             log(f"还需等待{count_down.countDownTime}秒才能领取{count_down.rewardTarget}盒花")
 

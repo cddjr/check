@@ -401,16 +401,16 @@ def change_cron_old(cron_file_path="/ql/db/crontab.db", repositories="cddjr_chec
         f.writelines(lines)
 
 
-def randomSleep(min=1, max=6):
-    interval = random.randint(min, max)
-    # print(f"随机等待{interval}秒...")
-    time.sleep(interval)
+def randomSleep(min=1.0, max=6.0):
+    delay = random.randint(int(min*1000), int(max*1000)) / 1000
+    # print(f"随机等待{delay}秒...")
+    time.sleep(delay)
 
 
-async def aio_randomSleep(min=1, max=6):
-    interval = random.randint(min, max)
-    # print(f"随机等待{interval}秒...")
-    await aio_sleep(interval)
+async def aio_randomSleep(min=1.0, max=6.0):
+    delay = random.randint(int(min*1000), int(max*1000)) / 1000
+    # print(f"随机等待{delay}秒...")
+    await aio_sleep(delay)
 
 
 def log(s: object, msg_list: Optional[list[str]] = None):
@@ -468,6 +468,33 @@ class MyIntEnum(IntEnum):
         if pseudo_member is None:
             pseudo_member = int.__new__(cls, value)
             pseudo_member._name_ = str(value)  # 以值作为枚举名 不会有冲突
+            pseudo_member._value_ = value
+            pseudo_member = cls._value2member_map_.setdefault(
+                value, pseudo_member)
+        return pseudo_member
+
+
+class MyStrEnum(str, Enum):
+    """在StrEnum基础上增加了自动创建枚举值的能力"""
+
+    @classmethod
+    def _missing_(cls, value):
+        """
+        Returns member (possibly creating it) if one can be found for value.
+        """
+        if not isinstance(value, str):
+            raise ValueError("%r is not a valid %s" %
+                             (value, cls.__qualname__))
+        new_member = cls.__CreatePseudoMember(value)
+        log(f"警告: {cls.__name__} 没有定义 '{value}', 已自动创建")
+        return new_member
+
+    @classmethod
+    def __CreatePseudoMember(cls, value):
+        pseudo_member = cls._value2member_map_.get(value, None)
+        if pseudo_member is None:
+            pseudo_member = str.__new__(cls, value)
+            pseudo_member._name_ = f'`{value}`'
             pseudo_member._value_ = value
             pseudo_member = cls._value2member_map_.setdefault(
                 value, pseudo_member)

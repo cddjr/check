@@ -18,6 +18,7 @@ from traceback import format_exc
 from typing import Optional, cast
 
 import json_codec
+from aiohttp import ClientResponse
 from aiohttp_retry import JitterRetry, RetryClient
 from yarl import URL
 
@@ -228,8 +229,15 @@ class AliMTOP:
         pass
 
     def __init__(self, cookies: SimpleCookie[str]):
+        async def RetryWhenBusy(resp: ClientResponse) -> bool:
+            obj = await resp.json()
+            for r in obj.get("ret") or []:
+                if cast(str, r).startswith("5000::"):
+                    # 系统繁忙，请稍后再试
+                    return False
+            return True
         self.session = RetryClient(raise_for_status=True,
-                                   retry_options=JitterRetry(attempts=3))
+                                   retry_options=JitterRetry(attempts=3, evaluate_response_callback=RetryWhenBusy))
         self.session._client.headers["Accept"] = "*/*"
         self.session._client.headers["Accept-Encoding"] = "gzip, deflate"
         self.session._client.headers["Accept-Language"] = "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7"
@@ -340,6 +348,9 @@ class TOWN:
             else:
                 ss = "\n".join(cookie_lastest)
                 self.mtop = AliMTOP(SimpleCookie(ss))
+
+            if tracknick := self.mtop.session._client.cookie_jar.filter_cookies(URL()).get("tracknick"):
+                log(f"账号: {tracknick.value}", msg)
 
             token = self.mtop.token
             log(f"当前令牌: {token}")

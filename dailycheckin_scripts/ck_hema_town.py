@@ -77,7 +77,7 @@ class TownCropInfo:
     fundsType: FundsType
     currentLevel: int
     maxedLevel: int
-    singleStep: int  # 每次喂养量
+    singleStep: int  # 每次消耗量
     progress: int
     totalProgress: int
     totalPercentage: str  # "1.76%"
@@ -347,7 +347,7 @@ class TOWN:
             self.shopIds = self.check_item.get("shopIds") or "no-store"
 
             for _ in "_":
-                # await aio_randomSleep(min=3)
+                # 部分任务依赖shopIds 不配置就不会下发
                 tasks = await self.QueryTasks()
                 if not tasks:
                     log("获取任务失败", msg)
@@ -426,33 +426,33 @@ class TOWN:
                             log(f"还需等待{count_down.countDownTime}秒才能领取{count_down.rewardTarget}盒花")
 
                 log(f"当前盒花: {info.balance}", msg)
-                # 喂养
+                # 喂养、浇水 等...
                 if not info.cropInfoModels:
-                    log("解析错误: 没有配置粮食", msg)
+                    log("解析错误: 没有配置cropInfoModels", msg)
                     break
                 if len(info.cropInfoModels) > 1:
                     log("遇到特例 cropInfoModels数量超过1个", msg)
                     log(info.cropInfoModels)
                 crop = info.cropInfoModels[0]
                 if info.balance < crop.singleStep:
-                    log(f"盒花少于{crop.singleStep}, 放弃喂养", msg)
+                    log(f"盒花少于{crop.singleStep}, 放弃操作", msg)
                 # print(await self.QueryIrrigateLadder(crop))
                 retentionBottleModel = None
                 while info.balance >= crop.singleStep:
-                    # 盒花余额足够本次喂养
+                    # 盒花余额足够本次操作
                     await aio_randomSleep(min=3, max=5)
                     if result := await self.IrrigateCrop(crop):
                         crop = result.cropInfoModel
                         info.balance = result.balance
                         info.cropInfoModels[0] = result.cropInfoModel
                         retentionBottleModel = result.retentionBottleModel
-                        log(f" 喂养成功: 总进度{crop.totalPercentage}")
+                        log(f" 操作成功: 总进度{crop.totalPercentage}")
                     else:
                         break
-                log(f"喂养进度: {crop.totalPercentage}", msg)
-                log(f"小鸡等级: {crop.currentLevel}", msg)
+                log(f"进度: {crop.totalPercentage}", msg)
+                log(f"等级: {crop.currentLevel}", msg)
                 log(crop.progressDesc, msg)
-                # TODO 如果前面没有领取info.retentionBottleModel 那么喂养后会返回什么
+                # TODO 如果前面没有领取info.retentionBottleModel 那么操作后会返回什么
                 if bottle := retentionBottleModel:
                     if bottle.valid:
                         # 可以领取
@@ -590,7 +590,7 @@ class TOWN:
             return None
 
     async def IrrigateCrop(self, crop: TownCropInfo):
-        '''喂鸡'''
+        '''喂鸡、浇水等操作'''
         assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.irrigateCrop",

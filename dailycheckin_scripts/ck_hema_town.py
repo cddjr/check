@@ -42,6 +42,7 @@ class TownLotus:
 @dataclass
 class TownRetentionBottle:
     title: str
+    alertTitle: str  # "明日07:00可领哦"
     point: int
     valid: bool
     # 以下仅在valid为True时有效
@@ -55,8 +56,9 @@ class TownRetentionBottle:
         taskInstanceId: str
 
         @property
-        def valid(self) -> bool:
-            return self.countDownTime <= 0
+        def seconds(self) -> int:
+            return int(self.countDownTime / 1000)
+
     countDownTaskModel: Optional[CountDown] = None
 
 
@@ -196,14 +198,14 @@ class TownGeneralReward:
 
 @dataclass
 class TownRewardResult:
-    generalRewardModels: list[TownGeneralReward]
+    generalRewardModels: list[TownGeneralReward] = []
 
 
 @dataclass
 class TownIrrigateResult:
     balance: int
     cropInfoModel: TownCropInfo
-    generalRewardModels: list[TownGeneralReward]
+    generalRewardModels: list[TownGeneralReward] = []
     retentionBottleModel: Optional[TownRetentionBottle] = None
 
 
@@ -400,7 +402,7 @@ class TOWN:
                                     continue
                         break
                 # 任务全部完成
-                # 接着尝试刷新盒花数量、领取所有盒花
+                # 接着尝试刷新盒花数量、领取所有盒花奖励
                 await aio_randomSleep(min=0.5, max=1.0)
                 info = await self.GetHomeInfo()
                 if not info:
@@ -413,27 +415,11 @@ class TOWN:
                     if result := await self.PickupLotus(lotus):
                         info.balance = result.model.balance
                         log(f"成功领取: [{lotus.title}]{lotus.point}盒花", msg)
-                if bottle := info.retentionBottleModel:
-                    if bottle.valid:
-                        # 可以领取
-                        await aio_randomSleep(min=2, max=4)
-                        if result := await self.PickupBottle(bottle):
-                            info = result
-                            log(f"成功领取: {bottle.point}盒花", msg)
-                    else:
-                        log(f"{bottle.title}: {bottle.point}盒花")
-                    if count_down := bottle.countDownTaskModel:
-                        if count_down.valid:
-                            # 可以领取
-                            await aio_randomSleep(min=2, max=4)
-                            if result := await self.ComputeTaskAndReward(count_down):
-                                point = sum(
-                                    r.rewardValue for r in result.generalRewardModels)
-                                log(f"成功领取: {point}盒花", msg)
-                        else:
-                            log(f"还需等待{count_down.countDownTime}秒才能领取{count_down.rewardTarget}盒花")
 
-                # 喂养、浇水 等...
+                if info.retentionBottleModel:
+                    msg += await self.ProcessBottle(info.retentionBottleModel)
+
+                # 盒花养成
                 if not info.cropInfoModels:
                     log("解析错误: 没有配置cropInfoModels", msg)
                     break
@@ -442,18 +428,25 @@ class TOWN:
                     log(info.cropInfoModels)
                 crop = info.cropInfoModels[0]
                 if info.balance < crop.singleStep:
-                    log(f"盒花少于{crop.singleStep}, 放弃操作", msg)
+                    log(f"盒花少于{crop.singleStep}, 放弃养成", msg)
                 # print(await self.QueryIrrigateLadder(crop))
                 retentionBottleModel = None
                 while info.balance >= crop.singleStep:
-                    # 盒花余额足够本次操作
+                    # 盒花余额足够本次养成
                     await aio_randomSleep(min=3, max=5)
                     if result := await self.IrrigateCrop(crop):
                         crop = result.cropInfoModel
                         info.balance = result.balance
                         info.cropInfoModels[0] = result.cropInfoModel
                         retentionBottleModel = result.retentionBottleModel
-                        log(f"操作成功: 当前进度{crop.totalPercentage}", msg)
+                        log(f"养成操作成功: 当前进度{crop.totalPercentage}", msg)
+                        if result.generalRewardModels:
+                            # TODO PickupLotus
+                            log(f"<养成奖励>: {result.generalRewardModels}", msg)
+                        if result.retentionBottleModel:
+                            if cd := result.retentionBottleModel.countDownTaskModel:
+                                # TODO 
+                                log(f"<养成倒计时奖励>: {cd}", msg)
                     else:
                         break
                 log(f"盒花: {info.balance}", msg)
@@ -461,25 +454,8 @@ class TOWN:
                 log(f"等级: {crop.currentLevel}", msg)
                 log(crop.progressDesc, msg)
                 # TODO 如果前面没有领取info.retentionBottleModel 那么操作后会返回什么
-                if bottle := retentionBottleModel:
-                    if bottle.valid:
-                        # 可以领取
-                        await aio_randomSleep(min=2, max=4)
-                        if result := await self.PickupBottle(bottle):
-                            info = result
-                            log(f"成功领取: {bottle.point}盒花", msg)
-                    else:
-                        log(f"{bottle.title}: {bottle.point}盒花")
-                    if count_down := bottle.countDownTaskModel:
-                        if count_down.valid:
-                            # 可以领取
-                            await aio_randomSleep(min=2, max=4)
-                            if result := await self.ComputeTaskAndReward(count_down):
-                                point = sum(
-                                    r.rewardValue for r in result.generalRewardModels)
-                                log(f"成功领取: {point}盒花", msg)
-                        else:
-                            log(f"还需等待{count_down.countDownTime}秒才能领取{count_down.rewardTarget}盒花")
+                if retentionBottleModel:
+                    msg += await self.ProcessBottle(retentionBottleModel)
 
         except Exception:
             log(f'失败: 请检查接口 {format_exc()}', msg)
@@ -497,6 +473,37 @@ class TOWN:
                                      asyncio.sleep(0.25))
 
         return "\n".join(msg)
+
+    async def ProcessBottle(self, bottle: TownRetentionBottle):
+        msg: list[str] = []
+        '''次留瓶任务、倒计时任务'''
+        if bottle.valid:
+            # 可以领取次留瓶任务
+            await aio_randomSleep(min=2, max=4)
+            if result := await self.PickupBottle(bottle):
+                info = result
+                log(f"成功领取: [次留瓶任务奖励]{bottle.point}盒花", msg)
+        else:
+            log(f"{bottle.alertTitle}: [次留瓶]{bottle.point}盒花")
+        if count_down := bottle.countDownTaskModel:
+            if count_down.countDownTime > 0:
+                if count_down.seconds < 60:
+                    # 60秒内的倒计时 我们尝试等
+                    log(f"等待{count_down.seconds}秒后领取[倒计时任务奖励]")
+                    await aio_randomSleep(min=2+count_down.seconds,
+                                          max=6+count_down.seconds)
+                    count_down.countDownTime = 0
+
+            if count_down.countDownTime <= 0:
+                # 可以领取倒计时任务
+                await aio_randomSleep(min=2, max=4)
+                if result := await self.ComputeTaskAndReward(count_down):
+                    point = sum(
+                        r.rewardValue for r in result.generalRewardModels)
+                    log(f"成功领取: [倒计时任务奖励]{point}盒花", msg)
+            else:
+                log(f"{count_down.seconds}秒后可领{count_down.rewardTarget}盒花")
+        return msg
 
     async def GetHomeInfo(self):
         assert self.mtop
@@ -596,7 +603,7 @@ class TOWN:
             return None
 
     async def IrrigateCrop(self, crop: TownCropInfo):
-        '''喂鸡、浇水等操作'''
+        '''养成'''
         assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.irrigateCrop",

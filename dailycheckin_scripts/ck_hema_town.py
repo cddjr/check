@@ -417,7 +417,9 @@ class TOWN:
                         log(f"成功领取: [{lotus.title}]{lotus.point}盒花", msg)
 
                 if info.retentionBottleModel:
-                    msg += await self.ProcessBottle(info.retentionBottleModel)
+                    result = await self.ProcessBottle(info.retentionBottleModel)
+                    msg.extend(result[0])
+                    info.balance += result[1]
 
                 # 盒花养成
                 if not info.cropInfoModels:
@@ -430,7 +432,6 @@ class TOWN:
                 if info.balance < crop.singleStep:
                     log(f"盒花少于{crop.singleStep}, 放弃养成", msg)
                 # print(await self.QueryIrrigateLadder(crop))
-                retentionBottleModel = None
                 while info.balance >= crop.singleStep:
                     # 盒花余额足够本次养成
                     await aio_randomSleep(min=3, max=5)
@@ -438,25 +439,21 @@ class TOWN:
                         crop = result.cropInfoModel
                         info.balance = result.balance
                         info.cropInfoModels[0] = result.cropInfoModel
-                        retentionBottleModel = result.retentionBottleModel
                         log(f"养成操作成功: 当前进度{crop.totalPercentage}", msg)
                         if result.generalRewardModels:
                             # TODO PickupLotus
                             log(f"<养成奖励>: {result.generalRewardModels}", msg)
                         if result.retentionBottleModel:
-                            if cd := result.retentionBottleModel.countDownTaskModel:
-                                # TODO 
-                                log(f"<养成倒计时奖励>: {cd}", msg)
+                            await aio_randomSleep(max=3)
+                            result = await self.ProcessBottle(result.retentionBottleModel)
+                            msg.extend(result[0])
+                            info.balance += result[1]
                     else:
                         break
                 log(f"盒花: {info.balance}", msg)
                 log(f"进度: {crop.totalPercentage}", msg)
                 log(f"等级: {crop.currentLevel}", msg)
                 log(crop.progressDesc, msg)
-                # TODO 如果前面没有领取info.retentionBottleModel 那么操作后会返回什么
-                if retentionBottleModel:
-                    msg += await self.ProcessBottle(retentionBottleModel)
-
         except Exception:
             log(f'失败: 请检查接口 {format_exc()}', msg)
         finally:
@@ -474,16 +471,17 @@ class TOWN:
 
         return "\n".join(msg)
 
-    async def ProcessBottle(self, bottle: TownRetentionBottle):
-        msg: list[str] = []
+    async def ProcessBottle(self, bottle: TownRetentionBottle, *, log_invalid=True):
         '''次留瓶任务、倒计时任务'''
+        total_points = 0
+        msg: list[str] = []
         if bottle.valid:
             # 可以领取次留瓶任务
             await aio_randomSleep(min=2, max=4)
-            if result := await self.PickupBottle(bottle):
-                info = result
+            if await self.PickupBottle(bottle):
+                total_points += bottle.point
                 log(f"成功领取: [次留瓶任务奖励]{bottle.point}盒花", msg)
-        else:
+        elif log_invalid:
             log(f"{bottle.alertTitle}: [次留瓶]{bottle.point}盒花")
         if count_down := bottle.countDownTaskModel:
             if count_down.countDownTime > 0:
@@ -498,12 +496,13 @@ class TOWN:
                 # 可以领取倒计时任务
                 await aio_randomSleep(min=2, max=4)
                 if result := await self.ComputeTaskAndReward(count_down):
-                    point = sum(
-                        r.rewardValue for r in result.generalRewardModels)
+                    point = sum(r.rewardValue
+                                for r in result.generalRewardModels)
                     log(f"成功领取: [倒计时任务奖励]{point}盒花", msg)
-            else:
+                    total_points += point
+            elif log_invalid:
                 log(f"{count_down.seconds}秒后可领{count_down.rewardTarget}盒花")
-        return msg
+        return (msg, total_points)
 
     async def GetHomeInfo(self):
         assert self.mtop
@@ -550,8 +549,7 @@ class TOWN:
                                            ext={"dip": 211432})
             if data.get("result") != "true":
                 raise AliMTOP.Error(data)
-            await aio_randomSleep(max=1.5)
-            return await self.GetHomeInfo()
+            return True
         except:
             log(f'失败: {format_exc()}')
             return None

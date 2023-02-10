@@ -51,49 +51,49 @@ class ProductHistory:
     viewed: bool = False
     name: Optional[str] = None
     d3: Optional[PriceRecord] = None
-    d7: Optional[PriceRecord] = None
-    d15: Optional[PriceRecord] = None
-    d30: Optional[PriceRecord] = None
+    d6: Optional[PriceRecord] = None
+    d9: Optional[PriceRecord] = None
+    d12: Optional[PriceRecord] = None
 
     @property
     def d3_low(self) -> str:
         return f'{self.d3.low/100}元' if self.d3 else "-"
 
     @property
-    def d7_low(self) -> str:
-        return f'{self.d7.low/100}元' if self.d7 else "-"
+    def d6_low(self) -> str:
+        return f'{self.d6.low/100}元' if self.d6 else "-"
 
     @property
-    def d15_low(self) -> str:
-        return f'{self.d15.low/100}元' if self.d15 else "-"
+    def d9_low(self) -> str:
+        return f'{self.d9.low/100}元' if self.d9 else "-"
 
     @property
-    def d30_low(self) -> str:
-        return f'{self.d30.low/100}元' if self.d30 else "-"
+    def d12_low(self) -> str:
+        return f'{self.d12.low/100}元' if self.d12 else "-"
 
     @property
     def d3_high(self) -> str:
         return f'{self.d3.high/100}元' if self.d3 else "-"
 
     @property
-    def d7_high(self) -> str:
-        return f'{self.d7.high/100}元' if self.d7 else "-"
+    def d6_high(self) -> str:
+        return f'{self.d6.high/100}元' if self.d6 else "-"
 
     @property
-    def d15_high(self) -> str:
-        return f'{self.d15.high/100}元' if self.d15 else "-"
+    def d9_high(self) -> str:
+        return f'{self.d9.high/100}元' if self.d9 else "-"
 
     @property
-    def d30_high(self) -> str:
-        return f'{self.d30.high/100}元' if self.d30 else "-"
+    def d12_high(self) -> str:
+        return f'{self.d12.high/100}元' if self.d12 else "-"
 
 
 class Days(IntEnum):
     DAY = 24 * 3600 * 1000
     DAYS_3 = 3 * DAY
-    DAYS_7 = 7 * DAY
-    DAYS_15 = 15 * DAY
-    DAYS_30 = 30 * DAY
+    DAYS_6 = DAYS_3 + DAYS_3
+    DAYS_9 = DAYS_6 + DAYS_3
+    DAYS_12 = DAYS_9 + DAYS_3
 
 
 _database = None
@@ -131,6 +131,7 @@ def save_database():
 
 def RecordPrice(p: PProduct) -> bool:
     '''记录商品价格'''
+    # TODO 改用sqlite3详细记录
     global _database, _history, _database_dirty
     dirty = False
     now = PClient.TryGetServerTime() or 0
@@ -142,10 +143,8 @@ def RecordPrice(p: PProduct) -> bool:
         history_record.name = p.name
         dirty = True
 
-    # d30如果距今超过30天则移除
-    # d7如果距今超过7天则移动至d15
-    STAGES: list = [("d30", Days.DAYS_30, None), ("d15", Days.DAYS_15, "d30"),
-                    ("d7", Days.DAYS_7, "d15"), ("d3", Days.DAYS_3, "d7")]
+    STAGES: list = [("d12", Days.DAYS_12, None), ("d9", Days.DAYS_9, "d12"),
+                    ("d6", Days.DAYS_6, "d9"), ("d3", Days.DAYS_3, "d6")]
 
     # 根据历史价格的最后更新日期进行重新归类
     for f, c, t in STAGES:
@@ -198,8 +197,8 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
         # 无记录
         return msg
     log(f"- {p.name}: 当前{p.price/100}元  ", msg)
-    log(f"  历史低价: {history_record.d3_low}, {history_record.d7_low}, {history_record.d15_low}, {history_record.d30_low}  ", msg)
-    log(f"  历史高价: {history_record.d3_high}, {history_record.d7_high}, {history_record.d15_high}, {history_record.d30_high}  ", msg)
+    log(f"  历史低价: {history_record.d3_low}, {history_record.d6_low}, {history_record.d9_low}, {history_record.d12_low}  ", msg)
+    log(f"  历史高价: {history_record.d3_high}, {history_record.d6_high}, {history_record.d9_high}, {history_record.d12_high}  ", msg)
     if time := history_record.d3.update_time if history_record.d3 else None:
         d = datetime.fromtimestamp(time / 1000).strftime("%Y-%m-%d %H:%M:%S")
         log(f"  变动时间: {d}", msg)

@@ -143,6 +143,8 @@ class TownTaskCenter:
         taskStatus: TownTaskStatus
         taskCategory: TownTaskCategory
 
+        dayRemainingLimit: int = 0  # 当天还可做几次任务
+
         _actId: str = ""
         taskId: Optional[str] = None
         cbdTaskInstanceId: Optional[str] = None

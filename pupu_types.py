@@ -356,7 +356,7 @@ class PBanner:
 
 @dataclass
 class PShareUser:
-    avatar: str
+    avatar: Optional[str]
     name: str
     best: bool  # 是否最佳
     time: int  # 抢包时间

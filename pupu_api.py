@@ -926,7 +926,7 @@ class Api(ApiBase):
                         discount_amount=rule["discount_amount"],
                     )
                 users = [PShareUser(
-                    avatar=item["avatar"],
+                    avatar=item.get("avatar"),
                     name=item["name"],
                     best=item["max"],
                     time=item["time"],

@@ -198,14 +198,14 @@ class TownGeneralReward:
 
 @dataclass
 class TownRewardResult:
-    generalRewardModels: list[TownGeneralReward] = []
+    generalRewardModels: list[TownGeneralReward]
 
 
 @dataclass
 class TownIrrigateResult:
     balance: int
     cropInfoModel: TownCropInfo
-    generalRewardModels: list[TownGeneralReward] = []
+    generalRewardModels: list[TownGeneralReward]
     retentionBottleModel: Optional[TownRetentionBottle] = None
 
 

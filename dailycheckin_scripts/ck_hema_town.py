@@ -441,8 +441,8 @@ class TOWN:
                             if result := await self.EventAccept(tasks, sub_task):
                                 total_points = sum(a.awardValue for a in sum(
                                     [r.content.awards for r in result], []))
-                                log(f"完成浏览: 将获得{total_points}盒花", msg)
-
+                                log(f"完成浏览: 将获得{total_points}盒花")
+                        continue
                     elif task.taskCategory != TownTask.Category.ANSWER:
                         # TODO 其它任务待研究
                         continue

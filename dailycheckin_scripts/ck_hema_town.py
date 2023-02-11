@@ -108,18 +108,54 @@ class TownPickup:
     model: Model
 
 
-class TownTaskCategory(MyStrEnum):
-    OPEN = "open_page"
-    VIEW = "viewPage"
-    TRADE = "trade"
-    ANSWER = "questionAnswer"
-    SHARE = "share"
+@dataclass
+class TownTask:
+    class Category(MyStrEnum):
+        OPEN = "open_page"
+        VIEW = "viewPage"
+        TRADE = "trade"
+        ANSWER = "questionAnswer"
+        SHARE = "share"
+
+    class Status(MyStrEnum):
+        WAIT = "-1"
+        ING = "0"
+        FINISH = "1"
+
+    taskTitle: str
+    taskCategory: Category
+
+    taskStatus: Status = Status.ING
+    dayRemainingLimit: int = 0  # 当天还可做几次任务
+
+    taskId: Optional[str] = None
+    cbdTaskInstanceId: Optional[str] = None
+    currentProgress: Optional[int] = None
+    totalProgress: Optional[int] = None
+    linkUrl: Optional[str] = None
 
 
-class TownTaskStatus(MyStrEnum):
-    WAIT = "-1"
-    ING = "0"
-    FINISH = "1"
+@dataclass
+class TownTasks(TownTask):
+    taskList: Optional[list[TownTask]] = None
+
+
+@dataclass
+class TownQueryTaskResult:
+    actId: str
+
+    @dataclass
+    class Attributes:
+        # 页面浏览多少秒可得奖励 如"15"
+        viewPegeDuration: int
+        cbdTaskId: str
+        viewPegeUrl: str
+
+    taskAttributes: Attributes
+    taskCategory: TownTask.Category
+    taskId: str
+    taskStatus: TownTask.Status
+    taskTitle: str
 
 
 @dataclass
@@ -137,22 +173,7 @@ class TownTaskCenter:
         signedDays: int
     signInModel: SignInModel
 
-    @dataclass
-    class TaskInfo:
-        taskTitle: str
-        taskStatus: TownTaskStatus
-        taskCategory: TownTaskCategory
-
-        dayRemainingLimit: int = 0  # 当天还可做几次任务
-
-        _actId: str = ""
-        taskId: Optional[str] = None
-        cbdTaskInstanceId: Optional[str] = None
-        currentProgress: Optional[int] = None
-        totalProgress: Optional[int] = None
-        linkUrl: Optional[str] = None
-
-    taskInfoDTOS: list[TaskInfo]
+    taskInfoDTOS: list[TownTasks]
     userSerialNo: str
 
 
@@ -209,6 +230,24 @@ class TownIrrigateResult:
     cropInfoModel: TownCropInfo
     generalRewardModels: list[TownGeneralReward]
     retentionBottleModel: Optional[TownRetentionBottle] = None
+
+
+@dataclass
+class TownEventAcceptResult:
+    @dataclass
+    class Content:
+        @dataclass
+        class Award:
+            awardType: str  # "point"
+            awardValue: int
+        processCode: list[str]
+        awards: list[Award]
+    actionCode: str
+    actionType: str
+    bizUniqueId: str
+    content: Content
+    contentType: str
+    persistent: str
 
 
 class AliMTOP:
@@ -277,9 +316,6 @@ class AliMTOP:
     async def Request(self, api: str, data, ext={}, *, retry_if_token_expired=True):
         if not isinstance(data, str):
             data = json.dumps(json_codec.encode(data), separators=(',', ':'))
-        # 拼接请求网址
-        url = URL(AliMTOP.HOST).with_path(
-            f"/h5/{api.lower()}/{AliMTOP.API_VER.lower()}")
         # 当前时间戳
         t = str(int(time() * 1000))
         # 计算签名
@@ -298,6 +334,10 @@ class AliMTOP:
             "data": data,
         }
         params.update(ext)
+        # 拼接请求网址
+        api = params["api"].lower()
+        v = params["v"].lower()
+        url = URL(AliMTOP.HOST).with_path(f"/h5/{api}/{v}")
 
         async with self.session.request("GET", url, params=params) as response:
             obj = await response.json()
@@ -363,7 +403,7 @@ class TOWN:
 
             for _ in "_":
                 # 部分任务依赖shopIds 不配置就不会下发
-                tasks = await self.QueryTasks()
+                tasks = await self.GetTasks()
                 if not tasks:
                     log("获取任务失败", msg)
                     break
@@ -377,15 +417,39 @@ class TOWN:
                 else:
                     log(f"重复签到: 已签{tasks.signInModel.signedDays}天", msg)
                 for task in tasks.taskInfoDTOS:
-                    if task.taskCategory != TownTaskCategory.ANSWER:
+                    if task.taskStatus != TownTask.Status.ING:
+                        continue
+                    if task.taskCategory == TownTask.Category.OPEN:
+                        # 浏览任务
+                        taskList = task.taskList or [task]
+                        for sub_task in taskList:
+                            if sub_task.taskStatus != TownTask.Status.ING:
+                                continue
+                            if sub_task.taskCategory != TownTask.Category.OPEN:
+                                # 这种情况可能吗
+                                log(
+                                    f"遇到特例 sub_task.taskCategory={sub_task.taskCategory}", msg)
+                                continue
+                            log(f"正在浏览: {sub_task.taskTitle}...")
+                            await aio_randomSleep(max=1.5)
+                            # 查询需要浏览多少秒等配置
+                            if task_options := await self.QueryTask(tasks, sub_task):
+                                await aio_randomSleep(min=task_options.taskAttributes.viewPegeDuration,
+                                                      max=task_options.taskAttributes.viewPegeDuration+3)
+                            else:
+                                await aio_randomSleep(min=3, max=5)
+                            if result := await self.EventAccept(tasks, sub_task):
+                                total_points = sum(a.awardValue for a in sum(
+                                    [r.content.awards for r in result], []))
+                                log(f"完成浏览: 将获得{total_points}盒花", msg)
+
+                    elif task.taskCategory != TownTask.Category.ANSWER:
                         # TODO 其它任务待研究
                         continue
                     # 答题任务
-                    if task.taskStatus != TownTaskStatus.ING:
-                        continue
                     await aio_randomSleep(max=1.5)
                     while True:
-                        q = await self.QueryQuestionTask(task)
+                        q = await self.GetQuestionTask(tasks, task)
                         if not q:
                             break
                         log(f"答题赚盒花({q.currentProgress+1}/{q.totalProgress})")
@@ -556,26 +620,23 @@ class TOWN:
             log(f'失败: {format_exc()}')
             return None
 
-    async def QueryTasks(self):
+    async def GetTasks(self):
         assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.querytaskcenterpage",
                                            data={"shopIds": self.shopIds})
-            task_center = json_codec.decode(data, TownTaskCenter)
-            for task in task_center.taskInfoDTOS:
-                task._actId = task_center.actDetail.actId
-            return task_center
+            return json_codec.decode(data, TownTaskCenter)
         except:
             log(f'失败: {format_exc()}')
             return None
 
-    async def QueryQuestionTask(self, task: TownTaskCenter.TaskInfo):
+    async def GetQuestionTask(self, task_center: TownTaskCenter, task: TownTask):
         assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.acquireAndQueryQuestionTask",
                                            data={"shopIds": self.shopIds,
                                                  "taskId": task.taskId,
-                                                 "actId": task._actId,
+                                                 "actId": task_center.actDetail.actId,
                                                  "cbdTaskInstanceId": task.cbdTaskInstanceId})
             q = json_codec.decode(data, TownQuestion)
             assert task.taskId
@@ -631,6 +692,81 @@ class TOWN:
                                                  "taskInstanceId": count_down.taskInstanceId,
                                                  "shopIds": self.shopIds})
             return json_codec.decode(data, TownRewardResult)
+        except:
+            log(f'失败: {format_exc()}')
+            return None
+
+    async def QueryTask(self, task_center: TownTaskCenter, task: TownTask):
+        assert self.mtop
+        try:
+            data = await self.mtop.Request("mtop.wdk.energy.task.query",
+                                           data={"actId": task_center.actDetail.actId,
+                                                 "taskId": task.taskId,
+                                                 })
+            return json_codec.decode(data, TownQueryTaskResult)
+        except:
+            log(f'失败: {format_exc()}')
+            return None
+
+    async def EventAccept(self, task_center: TownTaskCenter, task: TownTask):
+        '''上报页面浏览完成事件'''
+        assert self.mtop
+        try:
+            content = json.dumps({"actId": task_center.actDetail.actId,
+                                  "taskId": task.taskId,
+                                  }, separators=(',', ':'))
+            data = await self.mtop.Request(
+                api="mtop.wdk.mimir.event.accept",
+                ext={"v": "1.3"},
+                data={
+                    "eventId": "1",
+                    "gmtModified": "0",
+                    "bizUniqueId": str(int(time() * 1000)),
+                    "eventType": "3",
+                    "gmtCreate": "0",
+                    "version": "1",
+                    "content": content,
+                    "eventCode": "1001",
+                    "asyncProcess": "false",
+                    "name": "用户浏览会场事件",
+                    "asac": "2A20A099MA1XU8I8UC66B5",
+                    "bizIdentity": '{"bizId":"3","tenantID":"hm"}',
+                    "persistent": "-1",
+                    "contentType": "1"
+                })
+
+            @dataclass
+            class _Result:
+                @dataclass
+                class Content:
+                    processCode: str
+                    awards: str
+                actionCode: str
+                actionType: str
+                bizUniqueId: str
+                content: Content
+                contentType: str
+                persistent: str
+
+            result: list[TownEventAcceptResult] = []
+            for item in data.get("result") or []:
+                raw = json_codec.decode(item, _Result)
+                processCode = json_codec.decode(
+                    json.loads(raw.content.processCode), list[str])
+                awards = json_codec.decode(json.loads(
+                    raw.content.awards), list[TownEventAcceptResult.Content.Award])
+                result.append(TownEventAcceptResult(
+                    actionCode=raw.actionCode,
+                    actionType=raw.actionType,
+                    bizUniqueId=raw.bizUniqueId,
+                    contentType=raw.contentType,
+                    persistent=raw.persistent,
+                    content=TownEventAcceptResult.Content(
+                        processCode,
+                        awards,
+                    ),
+                ))
+            return result
         except:
             log(f'失败: {format_exc()}')
             return None

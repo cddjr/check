@@ -13,6 +13,7 @@ import json
 from dataclasses import dataclass
 from hashlib import md5
 from http.cookies import SimpleCookie
+from math import ceil
 from time import time
 from traceback import format_exc
 from typing import Optional, cast
@@ -362,6 +363,7 @@ class TOWN:
     __slots__ = ("check_item",
                  "cookie",
                  "mtop",
+                 "data",
                  "shopIds",
                  )
 
@@ -371,23 +373,23 @@ class TOWN:
 
     async def main(self):
         database = None
-        data = {}
+        self.data = {}
         name = self.check_item.get("name") or "default"
         msg: list[str] = []
         try:
             database = GetScriptConfig("hema_town.json")
-            data = database.get_value_2(name) or {} if database else {}
+            self.data = database.get_value_2(name) or {} if database else {}
 
             cookie = self.check_item.get("cookie")
             if not cookie:
                 raise SystemExit("cookie 配置有误")
 
-            cookie_lastest = data.get("cookie_lastest")
-            if data.get("cookie_user_specified") != cookie \
+            cookie_lastest = self.data.get("cookie_lastest")
+            if self.data.get("cookie_user_specified") != cookie \
                     or not cookie_lastest:
                 # cookie手动更新了
-                data["cookie_user_specified"] = cookie
-                data["cookie_lastest"] = None
+                self.data["cookie_user_specified"] = cookie
+                self.data["cookie_lastest"] = None
                 self.mtop = AliMTOP(SimpleCookie(cookie))
             else:
                 ss = "\n".join(cookie_lastest)
@@ -533,15 +535,16 @@ class TOWN:
                 log(f"进度: {crop.totalPercentage}", msg)
                 log(f"等级: {crop.currentLevel}", msg)
                 log(crop.progressDesc, msg)
+                msg += self.EstimatedRemainingTime(crop)
         except Exception:
             log(f'失败: 请检查接口 {format_exc()}', msg)
         finally:
             if database:
                 try:
                     if self.mtop:
-                        data["cookie_lastest"] = [k.OutputString()
-                                                  for k in self.mtop.session._client.cookie_jar]
-                    database.set_value(name, data)
+                        self.data["cookie_lastest"] = [k.OutputString()
+                                                       for k in self.mtop.session._client.cookie_jar]
+                    database.set_value(name, self.data)
                 except:
                     log(f'保存Cookie失败: {format_exc()}', msg)
             if self.mtop:
@@ -549,6 +552,62 @@ class TOWN:
                                      asyncio.sleep(0.25))
 
         return "\n".join(msg)
+
+    def EstimatedRemainingTime(self, crop: TownCropInfo):
+        @dataclass
+        class CropRecord:
+            actId: str
+            actInstanceId: str
+            progress: int
+            datestamp: int
+            estimated: Optional[int]
+
+        msg: list[str] = []
+        crops = json_codec.decode(self.data.get("crops") or {},
+                                  dict[str, CropRecord])
+        estimated = None
+        for _ in "_":
+            # "1.41%" -> 141
+            # 0~10000
+            curr_progress = int(
+                float(crop.totalPercentage.rstrip("%")) * 100.0)
+            curr_time = int(time()*1000)
+            if prev_record := crops.get(crop.actInstanceId):
+                estimated = prev_record.estimated
+                time_diff = curr_time - prev_record.datestamp
+                if time_diff < 86400_000:
+                    # 不足24小时 不计算
+                    break
+                # 0~10000
+                progress_diff = curr_progress - prev_record.progress
+                if progress_diff < 0:
+                    log(f"遇到特例 养成进度{progress_diff/100.0}%", msg)
+                    break
+                if progress_diff == 0:
+                    # 进度超过一天没有增加
+                    if prev_record.estimated is None:
+                        break
+                    # 增加上次预估的时间
+                    prev_record.estimated += int(time_diff / 86400_000)
+                else:
+                    prev_record.estimated = ceil(
+                        (10000 - curr_progress) / (progress_diff / time_diff * 86400_000))
+                prev_record.datestamp = curr_time
+                estimated = prev_record.estimated
+            else:
+                crops[crop.actInstanceId] = CropRecord(
+                    actId=crop.actId,
+                    actInstanceId=crop.actInstanceId,
+                    progress=curr_progress,
+                    datestamp=curr_time,
+                    estimated=None,
+                )
+        else:
+            # 数据有改动
+            self.data["crops"] = json_codec.encode(crops)
+        if estimated is not None:
+            log(f"预计还需{estimated}天实现目标", msg)
+        return msg
 
     async def ProcessBottle(self, bottle: TownRetentionBottle):
         '''次留瓶任务、倒计时任务'''

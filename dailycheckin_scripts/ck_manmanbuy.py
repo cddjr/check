@@ -7,68 +7,66 @@ new Env('慢慢买');
 https://apph5.manmanbuy.com/renwu/js/common.js
 
 """
-import traceback
-from utils import check, log
-from urllib3 import disable_warnings, Retry
-from requests.adapters import HTTPAdapter
-from requests.structures import CaseInsensitiveDict
-import requests
+import asyncio
 import urllib.parse
+from traceback import format_exc
+
+from aiohttp_retry import JitterRetry, RetryClient
+
+from utils import check, log
 
 
 class ManManBuy:
     # UA和devid都可以根据情况随机生成
-    userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 - mmbWebBrowse - ios"
-    c_devid = "43D5701C-AD8F-4503-BCA4-58C1D4EF42C9"
+    UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 - mmbWebBrowse - ios"
 
-    api_host = 'https://apph5.manmanbuy.com'
-    url_index = api_host + '/renwu/index.aspx?m_from=my_daka'
-    url_login = api_host + '/taolijin/login.aspx'
-    url_task = api_host + '/renwu/index.aspx'
+    API_HOST = 'https://apph5.manmanbuy.com'
+    URL_INDEX = API_HOST + '/renwu/index.aspx?m_from=my_daka'
+    URL_LOGIN = API_HOST + '/taolijin/login.aspx'
+    URL_TASK = API_HOST + '/renwu/index.aspx'
+
+    __slots__ = ("check_item",
+                 "session",
+                 "u_name",
+                 "u_token",
+                 "c_devid",
+                 "username",
+                 )
 
     def __init__(self, check_item):
         self.check_item = check_item
-        self.session = requests.Session()
-        self.session.verify = False
-        adapter = HTTPAdapter()
-        adapter.max_retries = Retry(connect=3, read=3, allowed_methods=False)
-        self.session.mount("https://", adapter)
-        self.session.mount("http://", adapter)
 
-    def ajax(self, method: str, url: str, data=None, json=None):
-        headers = CaseInsensitiveDict()
-        headers['X-Requested-With'] = 'XMLHttpRequest'
-        headers['Referer'] = self.url_index
-        if method.upper() not in ("GET", "HEAD"):
-            headers['Origin'] = self.api_host
-        return self.request(method, url, data=data, json=json, headers=headers).json()
+    async def InitSession(self):
+        self.session = RetryClient(raise_for_status=True,
+                                   retry_options=JitterRetry(attempts=3))
+        self.session._client.headers["Accept"] = "application/json, text/javascript, */*; q=0.01"
+        self.session._client.headers["Accept-Language"] = "zh-CN,zh-Hans;q=0.9"
+        self.session._client.headers["f-refer"] = "wv_h5"
+        self.session._client.headers["User-Agent"] = self.UA
+        self.session._client.headers["X-Requested-With"] = "XMLHttpRequest"
+        self.session._client.headers["Referer"] = self.URL_INDEX
+        self.session._client.headers["Connection"] = "keep-alive"
 
-    def request(self, method: str, url: str, data=None, json=None, headers: CaseInsensitiveDict = None) -> requests.Response:
-        """
-        发起一个http请求
+    async def ajax(self, method: str, url: str, data=None, json=None):
+        '''发起一个ajax请求'''
+        method = method.upper()
+        if method not in ("GET", "HEAD"):
+            headers = {"Origin": self.API_HOST}
+        else:
+            headers = None
+        async with self.session.request(method=method, url=url, headers=headers,
+                                        ssl=False, data=data, json=json) as response:
+            return await response.json()
 
-        :return: 如果成功 返回response对象
-        """
-        base_headers = CaseInsensitiveDict()
-        base_headers['Accept'] = 'application/json, text/javascript, */*; q=0.01'
-        base_headers['Accept-Language'] = 'zh-CN,zh-Hans;q=0.9'
-        base_headers['f-refer'] = 'wv_h5'
-        base_headers['User-Agent'] = self.userAgent
-        base_headers['Connection'] = 'keep-alive'
-        if headers:
-            base_headers.update(headers)
-        response = self.session.request(
-            method, url=url, headers=base_headers, data=data, json=json)
-        return response
-
-    def checkin(self):
-        """
-        立即签到
-        """
+    async def checkin(self):
+        '''立即签到'''
         msg = []
         try:
-            obj = self.ajax("post", self.url_task,
-                            data={'action': 'checkin', 'username': self.u_name, 'c_devid': self.c_devid, 'isAjaxInvoke': 'true'})
+            obj = await self.ajax("post", self.URL_TASK,
+                                  data={'action': 'checkin',
+                                        'username': self.u_name,
+                                        'c_devid': self.c_devid,
+                                        'isAjaxInvoke': 'true'})
             if int(obj["code"]) == 1:
                 data = obj["data"]
                 log(f'签到成功: 奖励积分+{data["jifen"]}', msg)
@@ -78,25 +76,26 @@ class ManManBuy:
                 exit()  # 目前没必要执行后续的操作
             else:
                 log(f'签到失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
-        except Exception as e:
-            log(f'签到异常: {e}', msg)
+        except Exception:
+            log(f'签到异常: {format_exc()}', msg)
         return msg
 
-    def login(self):
+    async def login(self):
         msg = []
+        log(f'账号: {self.username}', msg)
         try:
-            log(f'账号: {self.username}', msg)
-            obj = self.ajax("post", self.url_login,
-                            data={'action': 'newtokenlogin', 'u_name': self.u_name, 'u_token': self.u_token})
+            obj = await self.ajax("post", self.URL_LOGIN,
+                                  data={'action': 'newtokenlogin',
+                                        'u_name': self.u_name,
+                                        'u_token': self.u_token})
             if int(obj["code"]) == 1:
                 log('登录成功')
             else:
                 raise Exception(obj)
-        except Exception as e:
-            raise Exception(f'登录异常: {e}')
-        return msg
+        finally:
+            return msg
 
-    def main(self):
+    async def main(self):
         msg = []
         try:
             info = urllib.parse.parse_qs(self.check_item.get("login"))
@@ -107,23 +106,27 @@ class ManManBuy:
             self.u_name: str = u_name[0]
             self.u_token: str = u_token[0]
             # 设备id可以不同账号随机分配一个guid
-            self.c_devid = self.check_item.get("devid") or self.c_devid
+            self.c_devid = self.check_item.get("devid") \
+                or "43D5701C-AD8F-4503-BCA4-58C1D4EF42C9"
             self.username = self.check_item.get("name") or self.c_devid
 
-            msg += self.login()
-            msg += self.checkin()
-        except Exception as e:
-            traceback.print_exception(e)
-            log(f'失败: {e}', msg)
+            await self.InitSession()
+
+            msg += await self.login()
+            msg += await self.checkin()
+        except Exception:
+            log(f'失败: 请检查接口 {format_exc()}', msg)
+        finally:
+            await asyncio.gather(self.session.close(),
+                                 asyncio.sleep(0.25))
         msg = "\n".join(msg)
         return msg
 
 
 @check(run_script_name="慢慢买", run_script_expression="manmanbuy")
 def main(*args, **kwargs):
-    return ManManBuy(check_item=kwargs.get("value")).main()
+    return asyncio.run(ManManBuy(check_item=kwargs.get("value")).main())
 
 
 if __name__ == "__main__":
-    disable_warnings()
     main()

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-cron: 30 8,22 * * *
+cron: 23 7-23/8 * * *
 new Env('盒马小镇');
 
-找到请求https://market.m.taobao.com/app/ha/town/index.html
-复制所有Cookies
+找到请求http://acs.m.taobao.com/gw/com.taobao.mtop.mloginunitservice.autologin
+从表单中提取token
 
 TODO 优化、整理代码
 """
@@ -359,7 +359,7 @@ class AliMTOP:
         v = params["v"].lower()
         url = URL(AliMTOP.HOST).with_path(f"/h5/{api}/{v}")
 
-        async with self.session.request("GET", url, params=params) as response:
+        async with self.session.request("GET", url, ssl=False, params=params) as response:
             obj = await response.json()
             if any("TOKEN_EMPTY" in r or "TOKEN_EXOIRED" in r
                    for r in obj.get("ret") or []):
@@ -543,7 +543,7 @@ class TOWN:
                     log(info.cropInfoModels)
                 crop = info.cropInfoModels[0]
                 if info.balance < crop.singleStep:
-                    log(f"盒花少于{crop.singleStep}, 放弃养成", msg)
+                    log(f"盒花少于{crop.singleStep}, 放弃养成")
                 # 盒花养成
                 while info.balance >= crop.singleStep:
                     # 盒花余额足够本次养成

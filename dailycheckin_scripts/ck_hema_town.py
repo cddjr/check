@@ -11,6 +11,7 @@ TODO 优化、整理代码
 import asyncio
 import json
 from dataclasses import dataclass
+from datetime import date
 from hashlib import md5
 from http.cookies import SimpleCookie
 from math import ceil
@@ -615,9 +616,10 @@ class TOWN:
             curr_time = int(time()*1000)
             if prev_record := crops.get(crop.actInstanceId):
                 estimated = prev_record.estimated
-                time_diff = curr_time - prev_record.datestamp
-                if time_diff < 86400_000:
-                    # 不足24小时 不计算
+                time_diff = date.fromtimestamp(curr_time / 1000) \
+                    - date.fromtimestamp(prev_record.datestamp / 1000)
+                if time_diff.days < 1:
+                    # 按自然日计算不足一天
                     break
                 # 0~10000
                 progress_diff = curr_progress - prev_record.progress
@@ -629,10 +631,10 @@ class TOWN:
                     if prev_record.estimated is None:
                         break
                     # 增加上次预估的时间
-                    prev_record.estimated += int(time_diff / 86400_000)
+                    prev_record.estimated += time_diff.days
                 else:
                     prev_record.estimated = ceil(
-                        (10000 - curr_progress) / (progress_diff / time_diff * 86400_000))
+                        (10000 - curr_progress) / (progress_diff / time_diff.days))
                 prev_record.datestamp = curr_time
                 prev_record.progress = curr_progress
                 estimated = prev_record.estimated

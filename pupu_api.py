@@ -1,5 +1,6 @@
 from asyncio import gather as aio_gather
 from asyncio import sleep as aio_sleep
+from os import path
 from random import randint
 from sys import version_info as py_version
 from time import time
@@ -1045,8 +1046,15 @@ class Client(Api):
         super().__init__(device_id, refresh_token, None, None)
         self._refresh_token_user_specified = refresh_token
         self._saved = False
-        self._config = GetScriptConfig("pupu")
+        self._config = GetScriptConfig("pupu.json")
         self._config_dict = {}
+        if self._config and not path.exists(self._config.config_file) :
+            if (old_database := GetScriptConfig("pupu")) \
+                    and (keys := old_database.get_key_for_toml(old_database.config_file)):
+                # 从toml迁移至json
+                for k in keys:
+                    v = old_database.get_value_2(k)
+                    self._config.set_value(k, v)
 
     def LoadConfig(self, force: bool = False):
         """加载朴朴配置"""
@@ -1085,19 +1093,19 @@ class Client(Api):
     def SaveConfig(self):
         if not self._config:
             return False
-        self._config_dict["nickname"] = self.nickname or ""
-        self._config_dict["refresh_token_user_specified"] = self._refresh_token_user_specified or ""
-        self._config_dict["refresh_token_lastest"] = self.refresh_token or ""
-        self._config_dict["access_token"] = self.access_token or ""
+        self._config_dict["nickname"] = self.nickname
+        self._config_dict["refresh_token_user_specified"] = self._refresh_token_user_specified
+        self._config_dict["refresh_token_lastest"] = self.refresh_token
+        self._config_dict["access_token"] = self.access_token
         self._config_dict["access_expires"] = self.expires_in
-        self._config_dict["su_id"] = self.su_id or ""
-        self._config_dict["user_id"] = self.user_id or ""
+        self._config_dict["su_id"] = self.su_id
+        self._config_dict["user_id"] = self.user_id
         self._config_dict["recv_id"] = self.receiver.id
         self._config_dict["store_id"] = self.receiver.store_id
         self._config_dict["place_id"] = self.receiver.place_id
         self._config_dict["city_zip"] = self.receiver.city_zip
         self._config_dict["place_zip"] = self.receiver.place_zip
-        self._config_dict["avatar"] = self.avatar or ""
+        self._config_dict["avatar"] = self.avatar
         self._config.set_value(self.device_id, self._config_dict)
         self._saved = True
         return True

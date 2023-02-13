@@ -251,6 +251,18 @@ class TownEventAcceptResult:
     persistent: str
 
 
+@dataclass
+class TownLoginData:
+    autoLoginToken: str
+    expires: int
+    cookies: list[str]
+    sid: str
+    nick: str
+    uidDigest: str
+    userId: int
+    autoLoginToken_expire_in: int
+
+
 class AliMTOP:
     __slots__ = ("_token",
                  "session",
@@ -272,7 +284,7 @@ class AliMTOP:
     class TokenError(Error):
         pass
 
-    def __init__(self, cookies: SimpleCookie[str]):
+    def __init__(self):
         async def RetryWhenBusy(resp: ClientResponse) -> bool:
             obj = await resp.json()
             for r in obj.get("ret") or []:
@@ -289,10 +301,16 @@ class AliMTOP:
         self.session._client.headers["User-Agent"] = "Mozilla/5.0 (Linux; Android 13; MyAndroid Build/230208.01; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/106.0.5249.126 Mobile Safari/537.36 AliApp(wdkhema/5.57.0) TTID/10004819@hmxs_android_5.57.0 WindVane/8.5.0 A2U/x"
         self.session._client.headers["Referer"] = "https://market.m.taobao.com/app/ha/town/index.html?_hema_title_bar=false&_hema_hide_status_bar=true&source=tab"
         self.session._client.headers["Connection"] = "keep-alive"
-
-        # 初始化Cookies
         self._token = None
-        self.session._client.cookie_jar.update_cookies(cookies)
+
+    @property
+    def cookies(self) -> list[str]:
+        return [k.OutputString() for k in self.session._client.cookie_jar]
+
+    @cookies.setter
+    def cookies(self, cookies: list[str]):
+        for c in cookies:
+            self.session._client.cookie_jar.update_cookies(SimpleCookie(c))
 
     @property
     def token(self) -> Optional[str]:
@@ -341,6 +359,8 @@ class AliMTOP:
         url = URL(AliMTOP.HOST).with_path(f"/h5/{api}/{v}")
 
         async with self.session.request("GET", url, params=params) as response:
+            cc = response.request_info.headers.get("Cookie")
+            print(cc)
             obj = await response.json()
             if any("TOKEN_EMPTY" in r or "TOKEN_EXOIRED" in r
                    for r in obj.get("ret") or []):
@@ -369,41 +389,63 @@ class TOWN:
 
     def __init__(self, check_item) -> None:
         self.check_item: dict = check_item
-        self.mtop = None
 
     async def main(self):
-        database = None
-        self.data = {}
-        name = self.check_item.get("name") or "default"
         msg: list[str] = []
+        database = None
+        login_data = None
+        self.data = {}
+
+        user_id = self.check_item.get("user_id")
+        if not user_id:
+            raise SystemExit("user_id 配置有误")
+        login_token = self.check_item.get("token")
+        if not login_token:
+            raise SystemExit("token 配置有误")
+        umid = self.check_item.get("umidToken")
+        if not umid:
+            raise SystemExit("umidToken 配置有误")
+        wua = self.check_item.get("wua")
+        if not wua:
+            raise SystemExit("wua 配置有误")
+
+        self.mtop = AliMTOP()
+
         try:
             database = GetScriptConfig("hema_town.json")
-            self.data = database.get_value_2(name) or {} if database else {}
+            self.data = database.get_value_2(user_id) or {} if database else {}
 
-            cookie = self.check_item.get("cookie")
-            if not cookie:
-                raise SystemExit("cookie 配置有误")
+            login_data = json_codec.decode(
+                self.data["autologin"], TownLoginData) if "autologin" in self.data else None
 
-            cookie_lastest = self.data.get("cookie_lastest")
-            if self.data.get("cookie_user_specified") != cookie \
-                    or not cookie_lastest:
-                # cookie手动更新了
-                self.data["cookie_user_specified"] = cookie
-                self.data["cookie_lastest"] = None
-                self.mtop = AliMTOP(SimpleCookie(cookie))
+            nick = login_data.nick if login_data else self.check_item.get(
+                "name") or user_id
+            log(f"账号: {nick}", msg)
+
+            if self.data.get("token_user_specified") != login_token \
+                    or login_data is None:
+                # token手动更新了
+                self.data["token_user_specified"] = login_token
+                if "autologin" in self.data:
+                    del self.data["autologin"]
+                token = login_token
             else:
-                ss = "\n".join(cookie_lastest)
-                self.mtop = AliMTOP(SimpleCookie(ss))
+                self.mtop.cookies = login_data.cookies
+                token = login_data.autoLoginToken
 
-            if tracknick := self.mtop.session._client.cookie_jar.filter_cookies(URL()).get("tracknick"):
-                log(f"账号: {tracknick.value}", msg)
-
-            token = self.mtop.token
-            log(f"当前令牌: {token}")
+            log(f"当前MTOP令牌: {self.mtop.token}")
 
             self.shopIds = self.check_item.get("shopIds") or "no-store"
 
             for _ in "_":
+                if login_result := await self.AutoLogin(user_id, token, umid, wua):
+                    # 更新Cookie
+                    login_data = login_result
+                    self.mtop.cookies = login_data.cookies
+                else:
+                    log("自动登录失败", msg)
+                    break
+
                 # 部分任务依赖shopIds 不配置就不会下发
                 tasks = await self.GetTasks()
                 if not tasks:
@@ -541,10 +583,11 @@ class TOWN:
         finally:
             if database:
                 try:
-                    if self.mtop:
-                        self.data["cookie_lastest"] = [k.OutputString()
-                                                       for k in self.mtop.session._client.cookie_jar]
-                    database.set_value(name, self.data)
+                    if login_data:
+                        if self.mtop:
+                            login_data.cookies = self.mtop.cookies
+                        self.data["autologin"] = json_codec.encode(login_data)
+                    database.set_value(user_id, self.data)
                 except:
                     log(f'保存Cookie失败: {format_exc()}', msg)
             if self.mtop:
@@ -593,6 +636,7 @@ class TOWN:
                     prev_record.estimated = ceil(
                         (10000 - curr_progress) / (progress_diff / time_diff * 86400_000))
                 prev_record.datestamp = curr_time
+                prev_record.progress = curr_progress
                 estimated = prev_record.estimated
             else:
                 crops[crop.actInstanceId] = CropRecord(
@@ -643,7 +687,6 @@ class TOWN:
         return (msg, total_points)
 
     async def GetHomeInfo(self):
-        assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.homeInfo",
                                            data={"shopIds": self.shopIds},
@@ -654,7 +697,6 @@ class TOWN:
             return None
 
     async def PickupLotus(self, lotus: TownLotus):
-        assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.hippotown.lotus.pickup",
                                            data={"lotusId": lotus.id},
@@ -666,7 +708,6 @@ class TOWN:
 
     async def SignIn(self):
         '''签到'''
-        assert self.mtop
         try:
             _ = await self.mtop.Request("mtop.wdk.hippotown.point.sign",
                                         data={})
@@ -676,7 +717,6 @@ class TOWN:
             return None
 
     async def PickupBottle(self, bottle: TownRetentionBottle):
-        assert self.mtop
         assert bottle.valid
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.retentionReward",
@@ -693,7 +733,6 @@ class TOWN:
             return None
 
     async def GetTasks(self):
-        assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.querytaskcenterpage",
                                            data={"shopIds": self.shopIds})
@@ -703,7 +742,6 @@ class TOWN:
             return None
 
     async def GetQuestionTask(self, task_center: TownTaskCenter, task: TownTask):
-        assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.acquireAndQueryQuestionTask",
                                            data={"shopIds": self.shopIds,
@@ -722,7 +760,6 @@ class TOWN:
             return None
 
     async def AnswerQuestion(self, question: TownQuestion, answer: TownQuestion.Answer):
-        assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.answerQuestionTask",
                                            data={"shopIds": self.shopIds,
@@ -737,7 +774,6 @@ class TOWN:
 
     async def IrrigateCrop(self, crop: TownCropInfo):
         '''养成'''
-        assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.irrigateCrop",
                                            data={"actInstanceId": crop.actInstanceId})
@@ -747,7 +783,6 @@ class TOWN:
             return None
 
     async def QueryIrrigateLadder(self, crop: TownCropInfo):
-        assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.queryIrrigateLadder",
                                            data={"actId": crop.actId})
@@ -757,7 +792,6 @@ class TOWN:
             return None
 
     async def ComputeTaskAndReward(self, count_down: TownRetentionBottle.CountDown):
-        assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.fission.hippotown.computeTaskAndReward",
                                            data={"factType": "count_down",
@@ -769,7 +803,6 @@ class TOWN:
             return None
 
     async def QueryTask(self, task_center: TownTaskCenter, task: TownTask):
-        assert self.mtop
         try:
             data = await self.mtop.Request("mtop.wdk.energy.task.query",
                                            data={"actId": task_center.actDetail.actId,
@@ -782,7 +815,6 @@ class TOWN:
 
     async def EventAccept(self, task_center: TownTaskCenter, task: TownTask):
         '''上报页面浏览完成事件'''
-        assert self.mtop
         try:
             content = json.dumps({"actId": task_center.actDetail.actId,
                                   "taskId": task.taskId,
@@ -839,6 +871,44 @@ class TOWN:
                     ),
                 ))
             return result
+        except:
+            log(f'失败: {format_exc()}')
+            return None
+
+    async def AutoLogin(self, user: str, token: str, umid: str, wua: str):
+        '''
+        获取最新的Cookie 暂时写死一些数据
+        http://acs.m.taobao.com/gw/com.taobao.mtop.mloginunitservice.autologin/1.0/
+        '''
+        try:
+            content = {
+                "userId": user,
+                "tokenInfo": json.dumps({"appName": "23228014",
+                                        "token": token}, separators=(',', ':')),
+                "riskControlInfo": json.dumps({"umidToken": umid,
+                                               "wua": wua}, separators=(',', ':')),
+            }
+            data = await self.mtop.Request("com.taobao.mtop.mloginunitservice.autologin", content)
+
+            @dataclass
+            class LoginResult:
+                data: str
+                displayNick: str
+                hid: str
+                sid: str
+                site: str
+
+                @dataclass
+                class Ext:
+                    encryptUserId: str
+                    biometricId: str
+                extMap: Ext
+            if data := data.get("returnValue"):
+                result = json_codec.decode(data, LoginResult)
+            else:
+                raise ValueError
+
+            return json_codec.decode(json.loads(result.data), TownLoginData)
         except:
             log(f'失败: {format_exc()}')
             return None

@@ -359,8 +359,6 @@ class AliMTOP:
         url = URL(AliMTOP.HOST).with_path(f"/h5/{api}/{v}")
 
         async with self.session.request("GET", url, params=params) as response:
-            cc = response.request_info.headers.get("Cookie")
-            print(cc)
             obj = await response.json()
             if any("TOKEN_EMPTY" in r or "TOKEN_EXOIRED" in r
                    for r in obj.get("ret") or []):

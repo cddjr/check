@@ -1048,7 +1048,7 @@ class Client(Api):
         self._saved = False
         self._config = GetScriptConfig("pupu.json")
         self._config_dict = {}
-        if self._config and not path.exists(self._config.config_file) :
+        if self._config and not path.exists(self._config.config_file):
             if (old_database := GetScriptConfig("pupu")) \
                     and (keys := old_database.get_key_for_toml(old_database.config_file)):
                 # 从toml迁移至json

@@ -28,7 +28,7 @@ class PCouponCenterItem:
     discount_group_id: str
     condition_amount: int
     discount_amount: int
-    is_finished: bool
+    is_finished: bool = True
     received: int = 0
     received_limit: int = 0
 

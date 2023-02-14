@@ -164,12 +164,15 @@ def RecordPrice(p: PProduct) -> bool:
         history_record.name = p.name
         dirty = True
 
-    if history_record.lowest is None \
-            or p.price < cast(int, history_record.lowest_price):
+    if history_record.lowest is None or history_record.highest is None:
+        dirty = True
+
+    if history_record.lowest_price is None \
+            or p.price < history_record.lowest_price:
         history_record.lowest = p.price
         dirty = True
-    if history_record.highest is None \
-            or p.price > cast(int, history_record.highest_price):
+    if history_record.highest_price is None \
+            or p.price > history_record.highest_price:
         history_record.highest = p.price
         dirty = True
 

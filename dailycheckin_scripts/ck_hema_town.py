@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 23 7-23/8 * * *
+cron: 23 7,23 * * *
 new Env('盒马小镇');
 
 找到请求http://acs.m.taobao.com/gw/com.taobao.mtop.mloginunitservice.autologin

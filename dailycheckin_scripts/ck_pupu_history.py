@@ -220,7 +220,6 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
     ---
     有机番茄:
         最近低价: 7.00, 15.00, 10.00, 1.00
-        最近高价: 15.00, 15.00, 16.00, 16.00
         历史低价: 0.99
         历史高价: 99.99
     '''
@@ -233,7 +232,6 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
         return msg
     log(f"- {p.name}: 当前{p.price/100}元  ", msg)
     log(f"  最近低价: {history_record.d3_low}, {history_record.d6_low}, {history_record.d9_low}, {history_record.d12_low}  ", msg)
-    log(f"  最近高价: {history_record.d3_high}, {history_record.d6_high}, {history_record.d9_high}, {history_record.d12_high}  ", msg)
     if history_record.lowest_price is not None:
         log(f"  历史低价: {history_record.lowest_price/100}  ", msg)
     if history_record.highest_price is not None:

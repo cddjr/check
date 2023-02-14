@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """
+cron: 12 0 * * *
 new Env('MEIZU社区');
 """
 from urllib3 import disable_warnings, Retry
@@ -50,17 +51,15 @@ class Meizu:
         }
         response = self.session.post(
             url="https://myplus-api.meizu.cn/myplus-muc/u/user/signin", headers=headers).json()
-        # {"code":1012000000,"msg":"今日已签到","timestamp":1671698782431,"data":null}
+        if response.get("code") == 1012000000:
+            # 今日已签到
+            exit()  # 目前没必要执行后续的操作
         msg = response.get("msg")
         return msg
 
     def main(self):
         meizu_cookie = self.check_item.get("cookie")
-        try:
-            draw_count = int(self.check_item.get("draw_count", 0))
-        except Exception as e:
-            print("初始化抽奖次数失败: 重置为 0 ", str(e))
-            draw_count = 0
+        # draw_count = self.check_item.get("draw_count") or 0
         sign_msg = self.sign(cookie=meizu_cookie)
         nick, uid = self.user(cookie=meizu_cookie)
         # draw_msg, uid = self.draw(cookie=meizu_cookie, count=draw_count)

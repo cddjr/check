@@ -113,6 +113,7 @@ class PUPU:
                         data.get("items") or [], list[PCouponCenterItem])
                     if not any(item.can_received for item in items):
                         log("没有优惠券，领取失败", msg)
+                        exit()  # 目前没必要执行后续的操作
                         return msg
                     for coupon in items:
                         result, _ = await asyncio.gather(self._ReceiveCoupon(api, coupon),

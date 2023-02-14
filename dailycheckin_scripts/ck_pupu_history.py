@@ -55,6 +55,27 @@ class ProductHistory:
     d9: Optional[PriceRecord] = None
     d12: Optional[PriceRecord] = None
 
+    lowest: Optional[int] = None
+    highest: Optional[int] = None
+
+    @property
+    def lowest_price(self) -> Optional[int]:
+        if self.lowest is None:
+            # 从已有数据提取最低价
+            for r in [self.d3, self.d6, self.d9, self.d12]:
+                if r and (self.lowest is None or r.low < self.lowest):
+                    self.lowest = r.low
+        return self.lowest
+
+    @property
+    def highest_price(self) -> Optional[int]:
+        if self.highest is None:
+            # 从已有数据提取最高价
+            for r in [self.d3, self.d6, self.d9, self.d12]:
+                if r and (self.highest is None or r.high < self.highest):
+                    self.highest = r.high
+        return self.highest
+
     @property
     def d3_low(self) -> str:
         return f'{self.d3.low/100}元' if self.d3 else "-"
@@ -143,6 +164,15 @@ def RecordPrice(p: PProduct) -> bool:
         history_record.name = p.name
         dirty = True
 
+    if history_record.lowest_price is None \
+            or p.price < history_record.lowest_price:
+        history_record.lowest = p.price
+        dirty = True
+    if history_record.highest_price is None \
+            or p.price > history_record.highest_price:
+        history_record.highest = p.price
+        dirty = True
+
     STAGES: list = [("d12", Days.DAYS_12, None), ("d9", Days.DAYS_9, "d12"),
                     ("d6", Days.DAYS_6, "d9"), ("d3", Days.DAYS_3, "d6")]
 
@@ -186,8 +216,10 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
 
     ---
     有机番茄:
-        历史低价: 7.00, 15.00, 10.00, 1.00
-        历史高价: 15.00, 15.00, 16.00, 16.00
+        最近低价: 7.00, 15.00, 10.00, 1.00
+        最近高价: 15.00, 15.00, 16.00, 16.00
+        历史低价: 0.99
+        历史高价: 99.99
     '''
     global _database, _history, _database_dirty
     msg: list[str] = []
@@ -197,8 +229,12 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
         # 无记录
         return msg
     log(f"- {p.name}: 当前{p.price/100}元  ", msg)
-    log(f"  历史低价: {history_record.d3_low}, {history_record.d6_low}, {history_record.d9_low}, {history_record.d12_low}  ", msg)
-    log(f"  历史高价: {history_record.d3_high}, {history_record.d6_high}, {history_record.d9_high}, {history_record.d12_high}  ", msg)
+    log(f"  最近低价: {history_record.d3_low}, {history_record.d6_low}, {history_record.d9_low}, {history_record.d12_low}  ", msg)
+    log(f"  最近高价: {history_record.d3_high}, {history_record.d6_high}, {history_record.d9_high}, {history_record.d12_high}  ", msg)
+    if history_record.lowest_price is not None:
+        log(f"  历史低价: {history_record.lowest_price/100}  ", msg)
+    if history_record.highest_price is not None:
+        log(f"  历史高价: {history_record.highest_price/100}  ", msg)
     if time := history_record.d3.update_time if history_record.d3 else None:
         d = datetime.fromtimestamp(time / 1000).strftime("%Y-%m-%d %H:%M:%S")
         log(f"  变动时间: {d}", msg)

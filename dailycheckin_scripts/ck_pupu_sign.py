@@ -66,6 +66,7 @@ class PUPU:
             if isinstance(result, ApiResults.Error):
                 if result.code == ERROR_CODE.kRepeatedSignIn:
                     log("重复签到: 忽略", msg)
+                    exit()  # 目前没必要执行后续的操作
                 else:
                     log(result, msg)
             else:

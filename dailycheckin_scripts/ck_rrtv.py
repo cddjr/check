@@ -110,6 +110,7 @@ class RRTV:
         开启所有可开的宝箱
         """
         msg = []
+        empty = False
         try:
             obj = self.__postRequest(self.taskcenter_url_listbox)
             if obj["code"] == "0000":
@@ -133,12 +134,13 @@ class RRTV:
                 for box in availBoxes:
                     randomSleep(max=3)
                     msg += self.__openBox(box["id"], box["name"])
+                empty = not availBoxes
                 msg += ['\n']  # md缩进后需要一个换行结束缩进
             else:
                 log(f'开宝箱失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
             log(f'获取宝箱异常: 请检查接口 {e}', msg)
-        return msg
+        return (msg, empty)
 
     def giftDraw(self):
         """
@@ -265,6 +267,7 @@ class RRTV:
         0点容易失败 避开签到高峰
         """
         msg = []
+        repeated = False
         try:
             obj = self.__postRequest(self.activity_url_sign, {"dayOffset": 0})
             if obj["code"] == "0000":  # 8650应该是补签成功的返回码 8751是补签条件不满足
@@ -287,11 +290,12 @@ class RRTV:
                     log('签到奖励: 勋章 小蜜蜂7天', msg)
             elif obj["code"] == "8750":
                 log('重复签到: 忽略', msg)
+                repeated = True
             else:
                 log(f'签到失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
             log(f'签到异常: 请检查接口 {e}', msg)
-        return msg
+        return (msg, repeated)
 
     def main(self):
         msg = []
@@ -299,7 +303,8 @@ class RRTV:
             self.token: str = self.check_item.get("token", "")
             if not self.token.startswith('rrtv-'):
                 raise SystemExit('token配置有误 必须rrtv-开头')
-            msg += self.signIn()
+            sign_msg, sign_repeated = self.signIn()
+            msg += sign_msg
             # 无论签到是否成功，我们继续执行，也许能抽奖
             info_msg, canDraw = self.getSignInfo()
             msg += info_msg
@@ -309,10 +314,14 @@ class RRTV:
                 msg += self.giftDraw()
             # 尝试开宝箱
             randomSleep()
-            msg += self.openAllBoxes()
+            boxes_msg, boxes_empty = self.openAllBoxes()
+            msg += boxes_msg
             # 尝试VIP打卡
             randomSleep()
-            msg += self.vipSignIn()
+            vsign_msg, vsign_repeated = self.vipSignIn()
+            msg += vsign_msg
+            if all([sign_repeated, vsign_repeated, not canDraw, boxes_empty]):
+                exit()  # 目前没必要执行后续的操作
         except Exception as e:
             log(f'失败: 请检查接口{e}', msg)
         msg = "\n".join(msg)

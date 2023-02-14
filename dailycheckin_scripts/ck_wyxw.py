@@ -46,7 +46,7 @@ class WYXW:
                                         headers=headers) as response:
                     response = await response.json()
                     if response["code"] == 200 and "data" in response:
-                        result = json_codec.decode(await response["data"], SignResult)
+                        result = json_codec.decode(response["data"], SignResult)
                         # 再签47天得「持之以恒」3级勋章
                         log(f'签到成功: {result.subtitle}', msg)
                         log(f'签到奖励: 金币+{result.awardGoldCoin} 积分+{result.awardScore}', msg)

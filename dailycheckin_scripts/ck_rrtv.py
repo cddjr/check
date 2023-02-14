@@ -248,17 +248,19 @@ class RRTV:
 
         """
         msg = []
+        repeated = False
         try:
             obj = self.__postRequest(self.vip_url_clock)
             if obj["code"] == "0000":
                 log(f'打卡成功: 当前V力值{obj["data"]["changedValue"]}', msg)
             elif obj["code"] == "9999":
                 log('重复打卡: 忽略', msg)
+                repeated = True
             else:
                 log(f'打卡失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
         except Exception as e:
             log(f'打卡异常: 请检查接口 {e}', msg)
-        return msg
+        return msg, repeated
 
     def signIn(self):
         """

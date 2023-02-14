@@ -72,7 +72,7 @@ class ProductHistory:
         if self.highest is None:
             # 从已有数据提取最高价
             for r in [self.d3, self.d6, self.d9, self.d12]:
-                if r and (self.highest is None or r.high < self.highest):
+                if r and (self.highest is None or r.high > self.highest):
                     self.highest = r.high
         return self.highest
 

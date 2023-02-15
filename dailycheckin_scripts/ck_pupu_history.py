@@ -231,7 +231,7 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
         # 无记录
         return msg
     log(f"- {p.name}  ", msg)
-    log(f"  当前: {p.price/100}元  ", msg)
+    log(f"  当前价格: {p.price/100}元  ", msg)
     if history_record.lowest_price is not None:
         log(f"  历史低价: {history_record.lowest_price/100}元  ", msg)
     if history_record.highest_price is not None:

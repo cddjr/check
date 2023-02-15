@@ -230,12 +230,13 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
     if not history_record:
         # 无记录
         return msg
-    log(f"- {p.name}: 当前{p.price/100}元  ", msg)
-    log(f"  最近低价: {history_record.d3_low}, {history_record.d6_low}, {history_record.d9_low}, {history_record.d12_low}  ", msg)
+    log(f"- {p.name}  ", msg)
+    log(f"  当前: {p.price/100}元  ", msg)
     if history_record.lowest_price is not None:
-        log(f"  历史低价: {history_record.lowest_price/100}  ", msg)
+        log(f"  历史低价: {history_record.lowest_price/100}元  ", msg)
     if history_record.highest_price is not None:
-        log(f"  历史高价: {history_record.highest_price/100}  ", msg)
+        log(f"  历史高价: {history_record.highest_price/100}元  ", msg)
+    log(f"  最近低价: {history_record.d3_low}, {history_record.d6_low}, {history_record.d9_low}, {history_record.d12_low}  ", msg)
     if time := history_record.d3.update_time if history_record.d3 else None:
         d = datetime.fromtimestamp(time / 1000).strftime("%Y-%m-%d %H:%M:%S")
         log(f"  变动时间: {d}", msg)

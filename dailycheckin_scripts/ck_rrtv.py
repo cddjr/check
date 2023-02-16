@@ -77,7 +77,7 @@ class RRTV:
                     code = reward.get("code", "unknown")
                     name = f'{reward.get("text1")}{reward.get("text2")}'
                     rewards += [{"code": code, "name": name}]
-                    log(f'- {name}')
+                    log(f'- {name}  ')
             else:
                 log(f'获取奖品列表失败: code:{obj["code"]}, msg:{obj["msg"]}')
         except Exception as e:
@@ -98,11 +98,11 @@ class RRTV:
             if obj["code"] == "0000":
                 box = obj["data"]["boxs"][0]
                 reward = f'{box.get("rewardName")}+{box.get("rewardNum")}'
-                log(f'- 开{name}: {reward}', msg)
+                log(f'- 开{name}: {reward}  ', msg)
             else:
-                log(f'- 开{name}失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
+                log(f'- 开{name}失败: code:{obj["code"]}, msg:{obj["msg"]}  ', msg)
         except Exception as e:
-            log(f'- 开{name}异常: 请检查接口 {e}', msg)
+            log(f'- 开{name}异常: 请检查接口 {e}  ', msg)
         return msg
 
     def openAllBoxes(self):
@@ -155,12 +155,12 @@ class RRTV:
                 for reward in rewards:
                     if reward["code"] == materialCode:
                         # 中奖
-                        log(f'- 礼盒抽中: {reward["name"]} 请到App中查收', msg)
+                        log(f'- 礼盒抽中: {reward["name"]} 请到App中查收  ', msg)
                         break
             else:
-                log(f'- 抽奖失败: code:{obj["code"]}, msg:{obj["msg"]}', msg)
+                log(f'- 抽奖失败: code:{obj["code"]}, msg:{obj["msg"]}  ', msg)
         except Exception as e:
-            log(f'- 抽奖异常: 请检查接口 {e}', msg)
+            log(f'- 抽奖异常: 请检查接口 {e}  ', msg)
         return msg
 
     def __getCheckinInfo(self):
@@ -286,7 +286,7 @@ class RRTV:
                     log(f'签到奖励: 骰子+{dice}', msg)
                 # 这是签到获得的勋章
                 for medal in data.get("medalList", []):
-                    log(str(medal))
+                    # log(str(medal))
                     # medal == '2_7'
                     # 至少目前客户端是这样写死只有小蜜蜂
                     log('签到奖励: 勋章 小蜜蜂7天', msg)

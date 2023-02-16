@@ -62,23 +62,38 @@ class PUPU:
 
             log(f'账号: {api.nickname}', msg)
 
-            lottery_ids = set[str]()
+            lottery_ids: list[str] = []
             id = self.check_item.get("lottery_id")
             if id:
                 if isinstance(id, str):
-                    lottery_ids.add(id)
+                    if id not in lottery_ids:
+                        lottery_ids.append(id)
                 elif isinstance(id, Iterable):
-                    lottery_ids.update(id)
+                    for i in id:
+                        if i not in lottery_ids:
+                            lottery_ids.append(i)
 
             if self.check_item.get("find_lottery", True):
                 banner_result = await api.GetBanner(BANNER_LINK_TYPE.CUSTOM_LOTTERY,
-                                                    position_types=[60, 220, 560, 850, 860, 890])
+                                                    position_types=[60, 220, 560, 620, 850, 860, 890])
                 if isinstance(banner_result, ApiResults.Error):
                     log(banner_result, msg)
                 else:
+                    banner_result.banners.sort(key=lambda b: b.title)
+                    # 把翻翻乐放在第一位
+                    for i, b in enumerate(banner_result.banners):
+                        if "翻翻乐" in b.title:
+                            if i > 0:
+                                del banner_result.banners[i]
+                                banner_result.banners.insert(0, b)
+                            break
                     for b in banner_result.banners:
-                        lottery_ids.add(b.link_id)
-                        log(f" 找到抽奖: {b.title}")
+                        if b.link_id not in lottery_ids:
+                            if b.link_id not in lottery_ids:
+                                lottery_ids.append(b.link_id)
+                                log(f" 找到抽奖: {b.title}")
+            else:
+                log(f" 跳过了自动查找活动")
 
             if len(lottery_ids) > 0:
                 self.exchange_limit = self.check_item.get("coin_exchange", 0)
@@ -88,6 +103,7 @@ class PUPU:
                     msg += await self._Lottery(api, id)
             else:
                 log("无抽奖活动")
+                exit()  # 目前没必要执行后续的操作
         return msg
 
     async def _Lottery(self, api: PClient, id: str):

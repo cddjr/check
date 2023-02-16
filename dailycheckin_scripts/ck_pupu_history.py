@@ -239,7 +239,7 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
     log(f"  最近低价: {history_record.d3_low}, {history_record.d6_low}, {history_record.d9_low}, {history_record.d12_low}  ", msg)
     if time := history_record.d3.update_time if history_record.d3 else None:
         d = datetime.fromtimestamp(time / 1000).strftime("%Y-%m-%d %H:%M:%S")
-        log(f"  变动时间: {d}", msg)
+        log(f"  变动时间: {d}  ", msg)
     if not history_record.viewed:
         history_record.viewed = True
         _database_dirty = True

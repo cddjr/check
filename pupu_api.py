@@ -7,6 +7,7 @@ from time import time
 from typing import Any, Optional, Union  # 确保兼容<=Python3.9
 
 import json_codec
+from aiohttp import ClientResponse
 from aiohttp_retry import JitterRetry, RetryClient
 
 from pupu_types import *
@@ -30,8 +31,16 @@ class ApiBase(object):
         self.__init_http()
 
     def __init_http(self):
+        async def RetryWhenBusy(resp: ClientResponse) -> bool:
+            obj = await resp.json()
+            code = obj.get("errcode") or 0
+            msg = obj.get("errmsg") or ""
+            if code == -1 and "稍后再试" in msg:
+                # 系统繁忙，请稍后再试。
+                return False
+            return True
         self.__session = RetryClient(raise_for_status=True,
-                                     retry_options=JitterRetry(attempts=3))
+                                     retry_options=JitterRetry(attempts=3, evaluate_response_callback=RetryWhenBusy))
         self.__session._client.headers["Accept"] = "application/json, text/plain, */*"
         self.__session._client.headers["Accept-Encoding"] = "gzip, deflate"
         self.__session._client.headers["Accept-Language"] = "zh-CN,zh-Hans;q=0.9"

@@ -68,6 +68,7 @@ class TownRetentionBottle:
 class TownCropInfo:
     class CropStatus(MyStrEnum):
         UNK01 = "1"
+        UNK02 = "2"  # 应该是可领取了
         CLOSEOVER = "4"
         OVERDATE = "5"
         FINISH = "6"
@@ -545,7 +546,7 @@ class TOWN:
                 if info.balance < crop.singleStep:
                     log(f"盒花少于{crop.singleStep}, 放弃养成")
                 # 盒花养成
-                while info.balance >= crop.singleStep:
+                while info.balance >= crop.singleStep and crop.cropStatus != TownCropInfo.CropStatus.UNK02:
                     # 盒花余额足够本次养成
                     await aio_randomSleep(min=3, max=5)
                     if crop_result := await self.IrrigateCrop(crop):
@@ -628,10 +629,13 @@ class TOWN:
                     break
                 if progress_diff == 0:
                     # 进度超过一天没有增加
-                    if prev_record.estimated is None:
-                        break
-                    # 增加上次预估的时间
-                    prev_record.estimated += time_diff.days
+                    if curr_progress < 10000:
+                        if prev_record.estimated is None:
+                            break
+                        # 增加上次预估的时间
+                        prev_record.estimated += time_diff.days
+                    else:
+                        prev_record.estimated = 0
                 else:
                     prev_record.estimated = ceil(
                         (10000 - curr_progress) / (progress_diff / time_diff.days))

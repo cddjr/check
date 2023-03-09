@@ -219,9 +219,9 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
 
     ---
     有机番茄:
+        当前价格: 7.99元
+        历史价格: 1.99元~18.99元
         最近低价: 7.00, 15.00, 10.00, 1.00
-        历史低价: 0.99
-        历史高价: 99.99
     '''
     global _database, _history, _database_dirty
     msg: list[str] = []
@@ -232,10 +232,8 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
         return msg
     log(f"- {p.name}  ", msg)
     log(f"  当前价格: {p.price/100}元  ", msg)
-    if history_record.lowest_price is not None:
-        log(f"  历史低价: {history_record.lowest_price/100}元  ", msg)
-    if history_record.highest_price is not None:
-        log(f"  历史高价: {history_record.highest_price/100}元  ", msg)
+    if history_record.lowest_price is not None and history_record.highest_price is not None:
+        log(f"  历史价格: {history_record.lowest_price/100}元~{history_record.highest_price/100}元  ", msg)
     log(f"  最近低价: {history_record.d3_low}, {history_record.d6_low}, {history_record.d9_low}, {history_record.d12_low}  ", msg)
     if time := history_record.d3.update_time if history_record.d3 else None:
         d = datetime.fromtimestamp(time / 1000).strftime("%Y-%m-%d %H:%M:%S")

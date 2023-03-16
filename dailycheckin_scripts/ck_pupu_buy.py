@@ -136,14 +136,12 @@ class PUPU:
             log(f'总共收藏了{collections.total_count}件商品')
             if price_reduction <= 0:
                 # 第1次检测没有降价 等待片刻
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(1.0)
                 # 开始第2次检测 总共3次
                 retry = 2
                 while (retry <= 3):
                     log(f'第{retry}次尝试...')
-                    _, results = await asyncio.gather(
-                        asyncio.sleep(0.5),
-                        self.DetectProducts(api))
+                    results = await self.DetectProducts(api)
                     if isinstance(results, ApiResults.Error):
                         log(results, msg)
                         break
@@ -153,6 +151,7 @@ class PUPU:
                         # 存在降价商品 不再尝试检测
                         break
                     retry += 1
+                    await asyncio.sleep(2.0)
             if order_items:
                 # 并行获得加购商品可用的优惠券和派送时间
                 coupons_result, dtime_result, now = await asyncio.gather(

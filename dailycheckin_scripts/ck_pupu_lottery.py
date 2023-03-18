@@ -75,7 +75,7 @@ class PUPU:
 
             if self.check_item.get("find_lottery", True):
                 banner_result = await api.GetBanner(BANNER_LINK_TYPE.CUSTOM_LOTTERY,
-                                                    position_types=[60, 220, 560, 620, 850, 860, 890])
+                                                    position_types=[60, 220, 560, 620, 830, 850, 860, 890])
                 if isinstance(banner_result, ApiResults.Error):
                     log(banner_result, msg)
                 else:

@@ -97,14 +97,15 @@ class PUPU:
                     continue
                 if p.stock_quantity <= 0:
                     # 排除没货的
-                    log(f'  缺货: {p.name}')
+                    # log(f'  缺货: {p.name}')
                     continue
                 if p.sell_batches:
                     # TODO 以该数组的最低价作为当前价格
+                    log(f'  sell_batches!!: {p.name}')
                     pass
                 if p.price > goods.price:
                     # 排除价格高于预期的
-                    # log(f'  价格高于预期: {p.name} {p.price/100}元 > {goods.price/100}元')
+                    log(f'  价格高于预期: {p.name} {p.price/100}元 > {goods.price/100}元')
                     continue
                 log(f'价格低于预期: {p.name} {p.price/100}元', msg)
                 price_reduction += 1

@@ -25,7 +25,7 @@ from aiohttp import ClientSession, ClientTimeout
 
 from pupu_api import Client as PClient
 from pupu_types import *
-from utils import check, log
+from utils import check, log, aio_randomSleep
 
 assert sys.version_info >= (3, 9)
 
@@ -80,15 +80,27 @@ class PUPU:
 
     async def DetectProducts(self, api: PClient):
         """检测商品是否降价"""
-        # TODO 多页
-        collections = await api.GetProductCollections(page=1)
+        products: list[PProduct] = []
+        PAGE_SIZE = 10  # 增加分页大小是否会被判定？
+        page = 1  # 从第一页开始拉取
+        while (True):
+            collections = await api.GetProductCollections(page, PAGE_SIZE)
+            if isinstance(collections, ApiResults.Error):
+                log(collections, msg)
+                break
+            products.extend(collections.products)
+            if len(products) >= collections.total_count \
+                    or collections.total_count < PAGE_SIZE \
+                    or len(collections.products) < PAGE_SIZE:
+                # 不知朴朴怎么想的 空列表还会下发一个不为零的total_count
+                break
+            await aio_randomSleep(0.0, 0.125)
+            page += 1
         log(f'  当前服务器时间: {PClient.TryGetServerTime() or 0}')
-        if isinstance(collections, ApiResults.Error):
-            return collections
         msg: list[str] = []
         price_reduction = 0
         order_items: list[PProduct] = []
-        for p in collections.products:
+        for p in products:
             # 记录价格
             ck_pupu_history.RecordPrice(p)
             for goods in self._goods:
@@ -119,7 +131,7 @@ class PUPU:
                 # [杀(清洗), 杀(不清洗), 不杀]
                 p.remark = p.order_remarks[0] if p.order_remarks else ""
                 order_items.append(p)
-        return (msg, collections, price_reduction, order_items)
+        return (msg, products, price_reduction, order_items)
 
     async def Entry(self):
         msg: list[str] = []
@@ -134,13 +146,13 @@ class PUPU:
                 return msg
             sub_msg, collections, price_reduction, order_items = results
             msg += sub_msg
-            log(f'总共收藏了{collections.total_count}件商品')
+            log(f'总共收藏了{len(collections)}件商品')
             if price_reduction <= 0:
                 # 第1次检测没有降价 等待片刻
                 await asyncio.sleep(1.0)
                 # 开始第2次检测 总共3次
                 retry = 2
-                while (retry <= 3):
+                while (True):
                     log(f'第{retry}次尝试...')
                     results = await self.DetectProducts(api)
                     if isinstance(results, ApiResults.Error):
@@ -152,7 +164,9 @@ class PUPU:
                         # 存在降价商品 不再尝试检测
                         break
                     retry += 1
-                    await asyncio.sleep(2.0)
+                    if retry > 3:
+                        break
+                    await asyncio.sleep(1.0)
             if order_items:
                 # 并行获得加购商品可用的优惠券和派送时间
                 coupons_result, dtime_result, now = await asyncio.gather(

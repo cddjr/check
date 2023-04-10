@@ -427,6 +427,52 @@ class Api(ApiBase):
         except Exception:
             return ApiResults.Exception()
 
+    async def GetCoinConfig(self):
+        """朴分下单抽大奖"""
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kGet,
+                "https://j1.pupuapi.com/client/coin/unclaimed/config"
+            )
+            if obj["errcode"] == 0:
+                data = obj["data"]
+                return str(data["lottery_id"])
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def GetCoinList(self):
+        """可领取的朴分IDs"""
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kGet,
+                "https://j1.pupuapi.com/client/coin/unclaimed/list"
+            )
+            if obj["errcode"] == 0:
+                data = obj["data"]
+                return [str(item["id"]) for item in data]
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def DrawCoin(self, id: str):
+        """领取朴分"""
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kPost,
+                f"https://j1.pupuapi.com/client/coin/unclaimed/{id}"
+            )
+            # obj["errcode"] == 400000 # 已领取
+            if obj["errcode"] == 0:
+                data = obj["data"]
+                return int(data["coin"])
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
     async def GetBanner(self, link_type: BANNER_LINK_TYPE, position_types: Optional[list[Union[int, str]]] = None):
         assert not self.receiver.id_empty
         try:

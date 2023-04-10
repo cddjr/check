@@ -62,6 +62,23 @@ class PUPU:
 
             log(f'账号: {api.nickname}', msg)
 
+            # 领取所有可领取的积分
+            coin_ids = await api.GetCoinList()
+            if isinstance(coin_ids, ApiResults.Error):
+                log(coin_ids, msg)
+            elif not coin_ids:
+                log("当前无可领取的朴分")
+            else:
+                total_coin = 0
+                for i, id in enumerate(coin_ids):
+                    coin, _ = await asyncio.gather(api.DrawCoin(id), aio_randomSleep(1, 3))
+                    if isinstance(coin, ApiResults.Error):
+                        log(coin, msg)
+                    else:
+                        log(f" [{i+1}/{len(coin_ids)}]成功领取{coin}朴分")
+                        total_coin += coin
+                log(f"成功领取{total_coin}朴分", msg)
+
             lottery_ids: list[str] = []
             id = self.check_item.get("lottery_id")
             if id:
@@ -74,8 +91,9 @@ class PUPU:
                             lottery_ids.append(i)
 
             if self.check_item.get("find_lottery", True):
-                banner_result = await api.GetBanner(BANNER_LINK_TYPE.CUSTOM_LOTTERY,
-                                                    position_types=[60, 220, 560, 620, 830, 850, 860, 890])
+                banner_result, coin_cfg = await asyncio.gather(api.GetBanner(BANNER_LINK_TYPE.CUSTOM_LOTTERY,
+                                                                             position_types=[60, 220, 560, 620, 830, 850, 860, 890]),
+                                                               api.GetCoinConfig())
                 if isinstance(banner_result, ApiResults.Error):
                     log(banner_result, msg)
                 else:
@@ -92,6 +110,10 @@ class PUPU:
                             if b.link_id not in lottery_ids:
                                 lottery_ids.append(b.link_id)
                                 log(f" 找到抽奖: {b.title}")
+                if isinstance(coin_cfg, ApiResults.Error):
+                    log(coin_cfg, msg)
+                elif coin_cfg not in lottery_ids:
+                    lottery_ids.insert(0, coin_cfg)
             else:
                 log(f" 跳过了自动查找活动")
 

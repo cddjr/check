@@ -124,7 +124,7 @@ class PUPU:
                             log(f'成功领取: 满{coupon.condition_amount/100}减{coupon.discount_amount/100}元', msg)
                 else:
                     log(ApiResults.Error(obj), msg)
-        except:
+        except Exception:
             log(ApiResults.Exception(), msg)
         finally:
             return msg

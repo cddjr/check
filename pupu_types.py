@@ -327,7 +327,8 @@ class PProduct:
 
 @dataclass
 class PDiscountShare:
-    index: int  # 第{index}个领取的人得最大优惠券
+    # index: int  # 第{index}个领取的人得最大优惠券
+    indexes: list[int]  # 朴朴新规则，一个红包可能有多个最佳(确保从小到大排序)
     count: int  # 共{count}张优惠券
     share_id: str  # 红包ID
 

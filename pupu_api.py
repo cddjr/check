@@ -933,9 +933,11 @@ class Api(ApiBase):
                     )
                     if "discount_share_style" in o:
                         share = o["discount_share_style"]
+                        indexes = share.get("lucky_index") or [share["index"]]
+                        indexes.sort()
                         order.discount_share = PDiscountShare(
                             share_id=share["share_id"],
-                            index=share["index"],
+                            indexes=indexes,
                             count=share["count"],
                         )
                     orders.append(order)

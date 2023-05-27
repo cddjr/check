@@ -80,6 +80,7 @@ class PUPU:
 
     async def DetectProducts(self, api: PClient):
         """检测商品是否降价"""
+        msg: list[str] = []
         products: list[PProduct] = []
         PAGE_SIZE = 10  # 增加分页大小是否会被判定？
         page = 1  # 从第一页开始拉取
@@ -97,7 +98,6 @@ class PUPU:
             await aio_randomSleep(0.0, 0.125)
             page += 1
         log(f'  当前服务器时间: {PClient.TryGetServerTime() or 0}')
-        msg: list[str] = []
         price_reduction = 0
         order_items: list[PProduct] = []
         for p in products:

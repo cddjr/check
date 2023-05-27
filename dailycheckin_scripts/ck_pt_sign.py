@@ -50,27 +50,6 @@ class PT:
                             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                             "Accept-Language": "zh-CN,zh-Hans;q=0.9", }
 
-    def is_sign_needed(self, tag: str) -> bool:
-        record = self.records.get(tag)
-        if not record:
-            return True
-        time_diff = date.fromtimestamp(time()) \
-            - date.fromtimestamp(record.timestamp)
-        if time_diff.days < 1:
-            # 按自然日计算不足一天
-            return record.can_retry
-        else:
-            return True
-
-    async def te1(self):
-        return ["aa"]
-
-    async def te2(self):
-        return ["bb", "xx"]
-
-    async def te3(self):
-        return ["cc"]
-
     async def main(self):
         msg: list[str] = []
         try:
@@ -127,6 +106,18 @@ class PT:
         record.can_retry = True
         self.database_dirty = True
         return [f"{tag}: 请检查接口"]
+
+    def is_sign_needed(self, tag: str) -> bool:
+        record = self.records.get(tag)
+        if not record:
+            return True
+        time_diff = date.fromtimestamp(time()) \
+            - date.fromtimestamp(record.timestamp)
+        if time_diff.days < 1:
+            # 按自然日计算不足一天
+            return record.can_retry
+        else:
+            return True
 
     async def btschool_sign(self, cookie: str):
         try:

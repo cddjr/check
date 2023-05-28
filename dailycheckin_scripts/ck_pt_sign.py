@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 0 6,20 * * *
+cron: 13 6,20 * * *
 new Env('PT签到');
 
 """
@@ -84,28 +84,34 @@ class PT:
         return self.records[tag]
 
     def __on_sign_succ(self, tag: str, moli: int):
+        msg: list[str] = []
         record = self.__get_or_create_record(tag)
         record.timestamp = int(time())
         record.moli = moli
         record.can_retry = False
         self.database_dirty = True
-        return [f"{tag}: 签到成功，获得{moli}魔力"]
+        log(f"{tag}: 签到成功，获得{moli}魔力", msg)
+        return msg
 
     def __on_sign_fail(self, tag: str):
+        msg: list[str] = []
         record = self.__get_or_create_record(tag)
         record.timestamp = int(time())
         record.moli = 0
         record.can_retry = False
         self.database_dirty = True
-        return [f"{tag}: 签到失败"]
+        log(f"{tag}: 重复签到", msg)
+        return msg
 
-    def __on_sign_excp(self, tag: str):
+    def __on_sign_err(self, tag: str):
+        msg: list[str] = []
         record = self.__get_or_create_record(tag)
         record.timestamp = int(time())
         record.moli = -1
         record.can_retry = True
         self.database_dirty = True
-        return [f"{tag}: 请检查接口"]
+        log(f"{tag}: 请检查接口", msg)
+        return msg
 
     def is_sign_needed(self, tag: str) -> bool:
         record = self.records.get(tag)
@@ -120,36 +126,42 @@ class PT:
             return True
 
     async def btschool_sign(self, cookie: str):
+        TAG = "btschool"
         try:
-            print("btschool 流程开始")
+            print(f"--- {TAG} 流程开始 ---")
             header = self.header_base
+            header["Referer"] = "https://pt.btschool.club/torrents.php"
             header["Cookie"] = cookie
             async with RetryClient(raise_for_status=True,
                                    retry_options=JitterRetry(attempts=3)) as session:
                 async with session.get("https://pt.btschool.club/index.php?action=addbonus",
                                        headers=header, ssl=False
                                        ) as response:
-                    test = await response.text()
+                    text = await response.text()
                     PATTERN = "今天签到您获得"
-                    pos = test.find(PATTERN)
+                    pos = text.find(PATTERN)
                     if pos >= 0:
                         try:
                             pos += len(PATTERN)
-                            moli = int(test[pos:test.find("点魔力值", pos)])
-                            return self.__on_sign_succ("btschool", moli)
+                            moli = int(text[pos:text.find("点魔力值", pos)])
+                            return self.__on_sign_succ(TAG, moli)
                         except:
-                            return self.__on_sign_succ("btschool", moli=-1)
+                            return self.__on_sign_succ(TAG, moli=-1)
+                    elif "魔力值" in text:
+                        return self.__on_sign_fail(TAG)
                     else:
-                        return self.__on_sign_fail("btschool")
+                        print(TAG)
+                        print(text)
+                        return self.__on_sign_err(TAG)
         except Exception:
-            print(f'失败: 请检查接口 {format_exc()}')
-            return self.__on_sign_excp("btschool")
+            print(f'异常: 请检查接口 {format_exc()}')
+            return self.__on_sign_err(TAG)
         finally:
-            print("btschool 流程结束")
+            print(f"--- {TAG} 流程结束 ---")
 
     async def common_attendance(self, host: str, tag: str, cookie: str):
         try:
-            print(f"{tag} 流程开始")
+            print(f"--- {tag} 流程开始 ---")
             header = self.header_base
             header["Cookie"] = cookie
             async with RetryClient(raise_for_status=True,
@@ -167,16 +179,17 @@ class PT:
                             return self.__on_sign_succ(tag, moli)
                         except:
                             return self.__on_sign_succ(tag, moli=-1)
-                    else:
-                        if "签到过了" not in text:
-                            print(tag)
-                            print(text)
+                    elif "签到过了" in text:
                         return self.__on_sign_fail(tag)
+                    else:
+                        print(tag)
+                        print(text)
+                        return self.__on_sign_err(tag)
         except Exception:
-            print(f'失败: 请检查接口 {format_exc()}')
-            return self.__on_sign_excp(tag)
+            print(f'异常: 请检查接口 {format_exc()}')
+            return self.__on_sign_err(tag)
         finally:
-            print(f"{tag} 流程结束")
+            print(f"--- {tag} 流程结束 ---")
 
     def load_database(self):
         '''读取数据库'''

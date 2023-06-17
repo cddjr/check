@@ -44,7 +44,7 @@ class ApiBase(object):
         self.__session._client.headers["Accept"] = "application/json, text/plain, */*"
         self.__session._client.headers["Accept-Encoding"] = "gzip, deflate"
         self.__session._client.headers["Accept-Language"] = "zh-CN,zh-Hans;q=0.9"
-        self.__session._client.headers["pp-version"] = "2023010301"
+        self.__session._client.headers["pp-version"] = "2023012701"
         self.__session._client.headers["Connection"] = "keep-alive"
 
     async def Release(self):
@@ -982,6 +982,7 @@ class Api(ApiBase):
                         type=DiscountType(rule["discount_type"]),
                         condition_amount=rule["condition_amount"],
                         discount_amount=rule["discount_amount"],
+                        name=rule["name"],
                     )
                 users = [PShareUser(
                     avatar=item.get("avatar"),

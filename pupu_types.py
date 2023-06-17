@@ -339,6 +339,11 @@ class PDiscountRule:
     type: DiscountType
     condition_amount: int  # 6900
     discount_amount: int  # 700 满69减7元
+    name: Optional[str] = None  # 230617新增用于检测是不是垃圾券，比如 “朴朴分享券（冷藏冷冻专用）”
+
+    @property
+    def tips(self):
+        return f"满{self.condition_amount/100}减{self.discount_amount/100}{f'({self.name})' if self.name else ''}"
 
 
 @dataclass

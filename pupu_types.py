@@ -343,7 +343,7 @@ class PDiscountRule:
 
     @property
     def tips(self):
-        return f"满{self.condition_amount/100}减{self.discount_amount/100}{f'({self.name})' if self.name else ''}"
+        return f"满{self.condition_amount/100}减{self.discount_amount/100}{self.name or ''}"
 
 
 @dataclass

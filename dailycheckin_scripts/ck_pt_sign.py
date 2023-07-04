@@ -27,7 +27,7 @@ https://www.pttime.org/attendance.php
 “签到成功” “这是你的第 <b>XX</b> 次签到，已连续签到 <b>XX</b> 天，本次签到获得 <b>XXX</b> 个魔力值。”
 "已经签到过了"
 
-https://hdzone.me/attendance.php
+https://hdfun.me/attendance.php
 “签到成功” “这是您的第 <b>XX</b> 次签到，已连续签到 <b>XX</b> 天，本次签到获得 <b>XXX</b> 个魔力值。”
 “已经签到过了”
 """
@@ -61,7 +61,7 @@ class PT:
                 co_tasks.append(self.btschool_sign(btschool_cookie))
             # 以下使用通用流程处理签到
             for (tag, host) in [("pttime", "www.pttime.org"),
-                                ("hdzone", "hdzone.me"),
+                                ("hdzone", "hdfun.me"),
                                 # TODO ...
                                 ]:
                 cookie = self.check_item.get(tag, "")

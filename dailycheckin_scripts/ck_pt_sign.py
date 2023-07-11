@@ -179,7 +179,7 @@ class PT:
                             return self.__on_sign_succ(tag, moli)
                         except:
                             return self.__on_sign_succ(tag, moli=-1)
-                    elif "签到过了" in text:
+                    elif "签到过了" in text or "今天已签到" in text:
                         return self.__on_sign_fail(tag)
                     else:
                         print(tag)

@@ -59,6 +59,10 @@ class PT:
             btschool_cookie = self.check_item.get("btschool", "")
             if btschool_cookie and self.is_sign_needed("btschool"):
                 co_tasks.append(self.btschool_sign(btschool_cookie))
+            # 好大单独处理
+            hdarea_cookie = self.check_item.get("hdarea", "")
+            if hdarea_cookie and self.is_sign_needed("hdarea"):
+                co_tasks.append(self.hdarea_sign(hdarea_cookie))
             # 以下使用通用流程处理签到
             for (tag, host) in [("pttime", "www.pttime.org"),
                                 ("hdzone", "hdfun.me"),
@@ -148,6 +152,43 @@ class PT:
                         except:
                             return self.__on_sign_succ(TAG, moli=-1)
                     elif "魔力值" in text:
+                        return self.__on_sign_fail(TAG)
+                    else:
+                        print(TAG)
+                        print(text)
+                        return self.__on_sign_err(TAG)
+        except Exception:
+            print(f'异常: 请检查接口 {format_exc()}')
+            return self.__on_sign_err(TAG)
+        finally:
+            print(f"--- {TAG} 流程结束 ---")
+
+    async def hdarea_sign(self, cookie: str):
+        TAG = "hdarea"
+        try:
+            print(f"--- {TAG} 流程开始 ---")
+            header = self.header_base
+            header["Referer"] = "https://hdarea.club/"
+            header["Cookie"] = cookie
+            async with RetryClient(raise_for_status=True,
+                                   retry_options=JitterRetry(attempts=3)) as session:
+                async with session.post("https://hdarea.club/sign_in.php",
+                                        data={"action": "sign_in"},
+                                        headers=header, ssl=False
+                                        ) as response:
+                    text = await response.text()
+                    # 已连续签到2天，此次签到您获得了12魔力值奖励!
+                    PATTERN = "获得了"
+                    pos = text.find(PATTERN)
+                    if pos >= 0:
+                        try:
+                            pos += len(PATTERN)
+                            moli = int(text[pos:text.find("魔力值", pos)])
+                            return self.__on_sign_succ(TAG, moli)
+                        except:
+                            return self.__on_sign_succ(TAG, moli=-1)
+                    elif "重复签到" in text:
+                        # 请不要重复签到哦！
                         return self.__on_sign_fail(TAG)
                     else:
                         print(TAG)

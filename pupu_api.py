@@ -44,7 +44,7 @@ class ApiBase(object):
         self.__session._client.headers["Accept"] = "application/json, text/plain, */*"
         self.__session._client.headers["Accept-Encoding"] = "gzip, deflate"
         self.__session._client.headers["Accept-Language"] = "zh-CN,zh-Hans;q=0.9"
-        self.__session._client.headers["pp-version"] = "2023012701"
+        self.__session._client.headers["pp-version"] = "2023014601"
         self.__session._client.headers["Connection"] = "keep-alive"
 
     async def Release(self):
@@ -60,7 +60,7 @@ class ApiBase(object):
             id = f";{self.__device_id}"
         else:
             id = ""
-        return f"Pupumall/3.2.3;iOS 15.7.1{id}"
+        return f"Pupumall/3.4.8;iOS 15.7.1{id}"
 
     @property
     def web_user_agent(self):

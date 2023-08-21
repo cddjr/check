@@ -12,6 +12,7 @@ from time import time
 from traceback import format_exc
 
 import json_codec
+from aiohttp import ClientResponse
 from aiohttp_retry import JitterRetry, RetryClient
 
 from utils import GetScriptConfig, check, log
@@ -131,17 +132,40 @@ class PT:
 
     async def btschool_sign(self, cookie: str):
         TAG = "btschool"
+
+        async def try_parse_script(session: RetryClient, resp: ClientResponse):
+            '''
+            学校的CF盾现在降低了安全级别
+            可以尝试解析脚本
+            '''
+            text = await resp.text()
+            if len(text) > 1024:
+                return text
+            PATTERN = "window.location="
+            pos = text.find(PATTERN)
+            if pos < 0:
+                return text
+            pos += len(PATTERN)
+            pos2 = text.find(";</script>", pos)
+            location = text[pos:pos2]
+            path = location.replace(" ", "") \
+                .replace('"+"', "") \
+                .replace('"', "")
+            url = resp.real_url.with_path(path, encoded=True)
+            async with session.get(url, ssl=False) as response:
+                return await response.text()
+            return text
+
         try:
             print(f"--- {TAG} 流程开始 ---")
             header = self.header_base
             header["Referer"] = "https://pt.btschool.club/torrents.php"
             header["Cookie"] = cookie
             async with RetryClient(raise_for_status=True,
-                                   retry_options=JitterRetry(attempts=3)) as session:
+                                   retry_options=JitterRetry(attempts=3), headers=header) as session:
                 async with session.get("https://pt.btschool.club/index.php?action=addbonus",
-                                       headers=header, ssl=False
-                                       ) as response:
-                    text = await response.text()
+                                       ssl=False) as response:
+                    text = await try_parse_script(session, response)
                     PATTERN = "今天签到您获得"
                     pos = text.find(PATTERN)
                     if pos >= 0:

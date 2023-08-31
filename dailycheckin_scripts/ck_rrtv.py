@@ -10,11 +10,11 @@ import requests
 
 
 class RRTV:
-    clientVersion = "5.19.1"
-    clientType = "ios_zyb"  # android | android_Meizu
-    userAgent = "PPVideo/1.12 (iPhone; iOS 15.4.1; Scale/3.00)"
+    clientVersion = "5.21.1"
+    clientType = "ios_jxx"  # android | android_Meizu
+    userAgent = "JuXingXing/1.2 (iPhone; iOS 15.4.1; Scale/3.00)"
     # activity_userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 App/RRSPApp platform/iPhone AppVersion/1.12"
-    api_host = "https://api.rr.tv"
+    api_host = "https://api.juxingclub.com"
 
     activity_url_sign = api_host + "/rrtv-activity/sign/sign"
     activity_url_getinfo = api_host + "/rrtv-activity/sign/getInfo"

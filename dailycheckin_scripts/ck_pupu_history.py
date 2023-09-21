@@ -12,7 +12,7 @@ enabled 是否启用(默认true, 多个账号复用一个数据库)
 import asyncio
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import IntEnum
 from traceback import format_exc
 from typing import Optional, cast  # 确保兼容<=Python3.9
@@ -110,8 +110,8 @@ class ProductHistory:
 
 
 class Days(IntEnum):
-    DAY = 24 * 3600 * 1000
-    DAYS_3 = 3 * DAY
+    DAY = 1
+    DAYS_3 = 3
     DAYS_6 = DAYS_3 + DAYS_3
     DAYS_9 = DAYS_6 + DAYS_3
     DAYS_12 = DAYS_9 + DAYS_3
@@ -180,12 +180,15 @@ def RecordPrice(p: PProduct) -> bool:
                     ("d6", Days.DAYS_6, "d9"), ("d3", Days.DAYS_3, "d6")]
 
     # 根据历史价格的最后更新日期进行重新归类
-    for f, c, t in STAGES:
+    for f, days, t in STAGES:
         record = cast(Optional[PriceRecord],
                       getattr(history_record, f, None))
         if record is None:
             continue
-        if now - record.create_time < c:
+        time_diff = date.fromtimestamp(now / 1000) \
+            - date.fromtimestamp(record.create_time / 1000)
+        if time_diff.days < days:
+            # 按自然日计算
             continue
         if t:
             setattr(history_record, t, record)

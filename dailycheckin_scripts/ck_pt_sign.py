@@ -67,6 +67,7 @@ class PT:
             # 以下使用通用流程处理签到
             for (tag, host) in [("pttime", "www.pttime.org"),
                                 ("hdzone", "hdfun.me"),
+                                ("ubits", "ubits.club"),
                                 # TODO ...
                                 ]:
                 cookie = self.check_item.get(tag, "")

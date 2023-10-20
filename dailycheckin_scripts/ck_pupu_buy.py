@@ -73,6 +73,8 @@ class PUPU:
             msg2 = await self.Entry()
             if msg2:
                 msg += msg2
+            else:
+                msg = []
         except Exception:
             log(f'失败: 请检查接口 {format_exc()}', msg)
         finally:

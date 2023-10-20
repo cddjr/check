@@ -70,7 +70,9 @@ class PUPU:
 
             ck_pupu_history.load_database()
 
-            msg += await self.Entry()
+            msg2 = await self.Entry()
+            if msg2:
+                msg += msg2
         except Exception:
             log(f'失败: 请检查接口 {format_exc()}', msg)
         finally:
@@ -198,7 +200,7 @@ class PUPU:
                     log(f'当前服务器时间: {PClient.TryGetServerTime() or 0}')
                     msg += await self.ServerJ("朴朴降价了", f"{order_result.id}")
             elif price_reduction <= 0:
-                log('无降价', msg)
+                pass  # log('无降价', msg)
             else:
                 log('有降价 快去下单吧~', msg)
             log(f'当前服务器时间: {PClient.TryGetServerTime() or 0}')

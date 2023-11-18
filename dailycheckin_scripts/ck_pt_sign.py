@@ -68,6 +68,7 @@ class PT:
             for (tag, host) in [("pttime", "www.pttime.org"),
                                 ("hdzone", "hdfun.me"),
                                 ("ubits", "ubits.club"),
+                                ("hdatmos", "hdatmos.club"),
                                 # TODO ...
                                 ]:
                 cookie = self.check_item.get(tag, "")

@@ -42,9 +42,9 @@ class ApiBase(object):
         self.__session = RetryClient(raise_for_status=True,
                                      retry_options=JitterRetry(attempts=3, evaluate_response_callback=RetryWhenBusy))
         self.__session._client.headers["Accept"] = "application/json, text/plain, */*"
-        self.__session._client.headers["Accept-Encoding"] = "gzip, deflate"
-        self.__session._client.headers["Accept-Language"] = "zh-CN,zh-Hans;q=0.9"
-        self.__session._client.headers["pp-version"] = "2023014601"
+        self.__session._client.headers["Accept-Encoding"] = "gzip;q=1.0, compress;q=0.5"
+        self.__session._client.headers["Accept-Language"] = "zh-Hans-CN;q=1.0, ja-CN;q=0.9, en-CN;q=0.8"
+        self.__session._client.headers["pp-version"] = "2023018200"
         self.__session._client.headers["Connection"] = "keep-alive"
 
     async def Release(self):
@@ -60,7 +60,7 @@ class ApiBase(object):
             id = f";{self.__device_id}"
         else:
             id = ""
-        return f"Pupumall/3.4.8;iOS 15.7.1{id}"
+        return f"Pupumall/3.6.1;iOS 15.7.1{id}"
 
     @property
     def web_user_agent(self):

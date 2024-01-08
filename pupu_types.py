@@ -91,6 +91,7 @@ class CHANCE_OBTAIN_TYPE(MyIntEnum):
     SIGN_IN = 40
     INVITE_FRIEND_BOOST = 60  # 邀请助力
     GO_TO_BOOST = 70
+    UNKNOWN_170 = 170
 
 
 class RewardType(MyIntEnum):
@@ -106,6 +107,7 @@ class ActionTYPE(MyIntEnum):
 
 
 class TaskType(MyIntEnum):
+    UNKNOWN = 0
     FLASH_SALE = 240
     CUSTOM_LOTTERY = 250
     TOPIC = 260

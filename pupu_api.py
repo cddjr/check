@@ -582,18 +582,21 @@ class Api(ApiBase):
                         continue
                     # if page_task_rule["action_type"] != ActionTYPE.BROWSE:
                     #    continue
-                    tasks.append(PTask(
-                        task_name=task_json["task_name"],
-                        task_id=page_task_rule["task_id"],
-                        skim_time=page_task_rule["skim_time"],
-                        activity_id=page_task_rule["activity_id"],
-                        task_type=TaskType(
-                            page_task_rule["task_type"]),
-                        action_type=ActionTYPE(
-                            page_task_rule["action_type"]),
-                        task_status=TaskStatus(
-                            page_task_rule["task_status"]),
-                    ))
+                    try:
+                        tasks.append(PTask(
+                            task_name=task_json["task_name"],
+                            task_id=page_task_rule["task_id"],
+                            skim_time=page_task_rule["skim_time"],
+                            activity_id=page_task_rule["activity_id"],
+                            task_type=TaskType(
+                                page_task_rule.get("task_type") or 0),
+                            action_type=ActionTYPE(
+                                page_task_rule["action_type"]),
+                            task_status=TaskStatus(
+                                page_task_rule["task_status"]),
+                        ))
+                    except Exception:
+                        print(f"警告: 解析任务时遇到异常 {ApiResults.Exception()}")
                 return ApiResults.TaskGroupsData(tasks)
             else:
                 return ApiResults.Error(json=obj)

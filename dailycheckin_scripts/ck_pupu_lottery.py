@@ -24,12 +24,12 @@ assert sys.version_info >= (3, 9)
 
 
 class PUPU:
-
-    __slots__ = ("check_item",
-                 "device_id",
-                 "refresh_token",
-                 "exchange_limit",
-                 )
+    __slots__ = (
+        "check_item",
+        "device_id",
+        "refresh_token",
+        "exchange_limit",
+    )
 
     def __init__(self, check_item) -> None:
         self.check_item: dict = check_item
@@ -46,21 +46,22 @@ class PUPU:
 
             msg += await self.Lottery()
         except Exception:
-            log(f'失败: 请检查接口 {format_exc()}', msg)
+            log(f"失败: 请检查接口 {format_exc()}", msg)
         return "\n".join(msg)
 
     async def Lottery(self):
         msg: list[str] = []
         async with PClient(self.device_id, self.refresh_token) as api:
-            result = await api.InitializeToken(self.check_item.get("addr_filter"),
-                                               force_update_receiver=False)
+            result = await api.InitializeToken(
+                self.check_item.get("addr_filter"), force_update_receiver=False
+            )
             if isinstance(result, ApiResults.Error):
                 if api.nickname:
-                    log(f'账号: {api.nickname}', msg)
+                    log(f"账号: {api.nickname}", msg)
                 log(result, msg)
                 return msg
 
-            log(f'账号: {api.nickname}', msg)
+            log(f"账号: {api.nickname}", msg)
 
             # 领取所有可领取的积分
             coin_ids = await api.GetCoinList()
@@ -71,7 +72,9 @@ class PUPU:
             else:
                 total_coin = 0
                 for i, id in enumerate(coin_ids):
-                    coin, _ = await asyncio.gather(api.DrawCoin(id), aio_randomSleep(1, 3))
+                    coin, _ = await asyncio.gather(
+                        api.DrawCoin(id), aio_randomSleep(1, 3)
+                    )
                     if isinstance(coin, ApiResults.Error):
                         log(coin, msg)
                     else:
@@ -91,9 +94,13 @@ class PUPU:
                             lottery_ids.append(i)
 
             if self.check_item.get("find_lottery", True):
-                banner_result, coin_cfg = await asyncio.gather(api.GetBanner(BANNER_LINK_TYPE.CUSTOM_LOTTERY,
-                                                                             position_types=[60, 220, 560, 620, 830, 850, 860, 890]),
-                                                               api.GetCoinConfig())
+                banner_result, coin_cfg = await asyncio.gather(
+                    api.GetBanner(
+                        BANNER_LINK_TYPE.CUSTOM_LOTTERY,
+                        position_types=[60, 220, 560, 620, 830, 850, 860, 890],
+                    ),
+                    api.GetCoinConfig(),
+                )
                 if isinstance(banner_result, ApiResults.Error):
                     log(banner_result, msg)
                 else:
@@ -119,7 +126,7 @@ class PUPU:
 
             if len(lottery_ids) > 0:
                 self.exchange_limit = self.check_item.get("coin_exchange", 0)
-                log(f'朴分兑换限制数: {self.exchange_limit}次', msg)
+                log(f"朴分兑换限制数: {self.exchange_limit}次", msg)
                 for id in lottery_ids:
                     # 串行抽奖 确保print按顺序执行
                     msg += await self._Lottery(api, id)
@@ -140,31 +147,33 @@ class PUPU:
         # elif info.lottery.type != LOTTERY_TYPE.DRAW:
         #    log(f'[{info.lottery.name}] 不支持: {info.lottery.type}', msg)
         #    return msg
-        log(f'正在进行 [{info.lottery.name}]', msg)
+        log(f"正在进行 [{info.lottery.name}]", msg)
         # 同时拉取任务列表和抽奖机会兑换列表
         task_groups, chance_info = await asyncio.gather(
-            api.GetTaskGroupsData(info.lottery),
-            api.GetChanceEntrances(info.lottery))
+            api.GetTaskGroupsData(info.lottery), api.GetChanceEntrances(info.lottery)
+        )
         if isinstance(task_groups, ApiResults.Error):
             log(task_groups, msg)
         elif not task_groups.tasks:
-            log(' 没有配置任务')
+            log(" 没有配置任务")
         else:
             # 然后开始做任务
             for task in task_groups.tasks:
-                if task.task_status == TaskStatus.Undone:
+                if task.task_status != TaskStatus.Undone:
+                    continue
+                if task.page_rule:
                     # 每个任务至少间隔2~5秒的时间
                     _, task_result = await asyncio.gather(
-                        aio_randomSleep(2, 5),
-                        api.PostPageTaskComplete(task))
+                        aio_randomSleep(2, 5), api.PostPageTaskComplete(task)
+                    )
                     if isinstance(task_result, ApiResults.Error):
                         log(task_result)
                     else:
-                        log(f'    {task.task_name}: 已完成')
+                        log(f"    {task.task_name}: 已完成")
 
         # 接着尝试朴分兑换
         exchange_count = 0
-        while (True):
+        while True:
             if isinstance(chance_info, ApiResults.Error):
                 # 拉取失败了
                 if chance_info.code != ERROR_CODE.kUnk_400k:
@@ -181,17 +190,22 @@ class PUPU:
                 # 没有可用的朴分兑换入口
                 entrance = None
             if entrance:
-                while chance_info.coin_balance >= entrance.target_value \
-                        and exchange_count < self.exchange_limit:
+                while (
+                    chance_info.coin_balance >= entrance.target_value
+                    and exchange_count < self.exchange_limit
+                ):
                     # 朴分足够、兑换次数没超过限制
                     _, exchange_result = await asyncio.gather(
                         aio_randomSleep(4, 8),  # 间隔4~8秒，确保朴分、抽奖机会数更新
-                        api.CoinExchange(info.lottery, entrance))
+                        api.CoinExchange(info.lottery, entrance),
+                    )
                     if isinstance(exchange_result, ApiResults.Error):
                         log(exchange_result)
                         break
                     exchange_count += 1
-                    log(f'    第{exchange_count}次{entrance.title}: 成功兑换{exchange_result.gain_num}次抽奖机会')
+                    log(
+                        f"    第{exchange_count}次{entrance.title}: 成功兑换{exchange_result.gain_num}次抽奖机会"
+                    )
                     # 更新朴分余额
                     chance_info = await api.GetChanceEntrances(info.lottery)
                     if isinstance(chance_info, ApiResults.Error):
@@ -200,7 +214,9 @@ class PUPU:
                         break
                 else:
                     if chance_info.coin_balance < entrance.target_value:
-                        log(f" 当前朴分{chance_info.coin_balance}少于{entrance.target_value}, 放弃兑换")
+                        log(
+                            f" 当前朴分{chance_info.coin_balance}少于{entrance.target_value}, 放弃兑换"
+                        )
             # 开始抽奖
             result, lottery_msg = await self.__Lottery(api, info)
             msg += lottery_msg
@@ -219,23 +235,23 @@ class PUPU:
             log(chances_info, msg)
             return (False, msg)
         elif chances_info.remain_chances <= 0:
-            log(' 没有抽奖机会', msg)
+            log(" 没有抽奖机会", msg)
             return (False, msg)
 
-        log(f' 当前有{chances_info.remain_chances}次抽奖机会', msg)
+        log(f" 当前有{chances_info.remain_chances}次抽奖机会", msg)
         for i in range(chances_info.remain_chances):
             # 每次抽奖至少间隔4~8秒的时间
             _, lottery_result = await asyncio.gather(
-                aio_randomSleep(4, 8),
-                api.Lottery(info.lottery))
+                aio_randomSleep(4, 8), api.Lottery(info.lottery)
+            )
             if isinstance(lottery_result, ApiResults.Error):
-                log(f'  第{i+1}次抽奖: {lottery_result}', msg)
+                log(f"  第{i+1}次抽奖: {lottery_result}", msg)
             else:
-                log(f'  第{i+1}次抽奖: {lottery_result.prize.name}', msg)
+                log(f"  第{i+1}次抽奖: {lottery_result.prize.name}", msg)
         return (True, msg)
 
 
-@ check(run_script_name="朴朴抽奖", run_script_expression="pupu")
+@check(run_script_name="朴朴抽奖", run_script_expression="pupu")
 def main(*args, **kwargs):
     return asyncio.run(PUPU(check_item=kwargs.get("value")).main())
 

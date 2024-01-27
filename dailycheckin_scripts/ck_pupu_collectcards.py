@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 35 9,23 30-31,1-4 1,2 *
+cron: 15 8,23 25-31,1-10 1,2 *
 new Env('朴朴集卡');
 
 微信登录朴朴app
@@ -23,13 +23,13 @@ assert sys.version_info >= (3, 9)
 
 
 class PUPU:
-
-    __slots__ = ("check_item",
-                 "device_id",
-                 "refresh_token",
-                 "_lottery",
-                 "_keep_cards",
-                 )
+    __slots__ = (
+        "check_item",
+        "device_id",
+        "refresh_token",
+        "_lottery",
+        "_keep_cards",
+    )
 
     def __init__(self, check_item) -> None:
         self.check_item: dict = check_item
@@ -53,22 +53,23 @@ class PUPU:
 
             msg += await self.CollectCards()
         except Exception:
-            log(f'失败: 请检查接口 {format_exc()}', msg)
+            log(f"失败: 请检查接口 {format_exc()}", msg)
         return "\n".join(msg)
 
     async def CollectCards(self):
-        '''开始集卡'''
+        """开始集卡"""
         msg: list[str] = []
         async with PClient(self.device_id, self.refresh_token) as api:
-            result = await api.InitializeToken(self.check_item.get("addr_filter"),
-                                               force_update_receiver=False)
+            result = await api.InitializeToken(
+                self.check_item.get("addr_filter"), force_update_receiver=False
+            )
             if isinstance(result, ApiResults.Error):
                 if api.nickname:
-                    log(f'账号: {api.nickname}', msg)
+                    log(f"账号: {api.nickname}", msg)
                 log(result, msg)
                 return msg
 
-            log(f'账号: {api.nickname}', msg)
+            log(f"账号: {api.nickname}", msg)
 
             rule = await api.GetCollectCardRule()
             if isinstance(rule, ApiResults.Error):
@@ -81,13 +82,15 @@ class PUPU:
 
             log(f"本期活动: {rule.name}", msg)
 
-            task_groups, lottery_info = await asyncio.gather(api.GetTaskGroupsData(rule),
-                                                             api.GetLotteryInfo(rule.card_lottery_activity_id),)
+            task_groups, lottery_info = await asyncio.gather(
+                api.GetTaskGroupsData(rule),
+                api.GetLotteryInfo(rule.card_lottery_activity_id),
+            )
             if isinstance(task_groups, ApiResults.Error):
                 log(task_groups, msg)
                 return msg
             elif not task_groups.tasks:
-                log(' 没有配置任务')
+                log(" 没有配置任务")
 
             # 同时拉取抽奖详情
             if isinstance(lottery_info, ApiResults.Error):
@@ -98,36 +101,78 @@ class PUPU:
             for task in task_groups.tasks:
                 if task.task_status != TaskStatus.Undone:
                     continue
-                # 每个任务至少间隔2~5秒的时间
-                task_result, _ = await asyncio.gather(
-                    api.PostPageTaskComplete(task),
-                    aio_randomSleep(2, 5),)
-                if isinstance(task_result, ApiResults.Error):
-                    log(task_result)
-                else:
-                    log(f'    {task.task_name}: 已完成')
+                if task.page_rule:
+                    # 每个任务至少间隔2~5秒的时间
+                    task_result, _ = await asyncio.gather(
+                        api.PostPageTaskComplete(task),
+                        aio_randomSleep(2, 5),
+                    )
+                    if isinstance(task_result, ApiResults.Error):
+                        log(task_result)
+                    else:
+                        log(f"    {task.task_name}: 已完成")
+                elif task.answer_rule:
+                    """
+                    TODO 答题任务 采集题库
+                    """
+                    questionnaire, _ = await asyncio.gather(
+                        api.GetQuestionnaire(task),
+                        aio_randomSleep(2, 5),
+                    )
+                    if isinstance(questionnaire, ApiResults.Error):
+                        log(questionnaire)
+                    else:
+                        answer = False
+                        for q in questionnaire.questions:
+                            if q.id == "8d133804-64cc-4ae4-aacf-e4a0d55c8182":
+                                for options in q.options:
+                                    if options.name == "车厘子":
+                                        options.selected = 1
+                                        answer = True
+                            elif q.id == "0c1da1e8-50e8-40b0-8e0d-43496996c928":
+                                for options in q.options:
+                                    if options.name == "月中13-16日":
+                                        options.selected = 1
+                                        answer = True
+                            else:
+                                print(q)
+                        if answer:
+                            succ, _ = await asyncio.gather(
+                                api.SubmitQuestionnaire(questionnaire),
+                                aio_randomSleep(2, 5),
+                            )
+                            if isinstance(succ, ApiResults.Error):
+                                log(succ)
+                            elif succ:
+                                log(f"    {task.task_name}: 已提交", msg)
+                                continue
+                        log(f"    {task.task_name}: 未提交")
 
             # 获取抽卡次数
+            await aio_randomSleep(2, 3)
             remain_chances = await api.GetCollectCardLotteryCount(rule)
             if isinstance(remain_chances, ApiResults.Error):
                 log(remain_chances, msg)
                 remain_chances = 0
             elif remain_chances <= 0:
-                log(' 没有抽卡机会', msg)
+                log(" 没有抽卡机会", msg)
             else:
-                log(f' 当前有{remain_chances}次抽卡机会', msg)
+                log(f" 当前有{remain_chances}次抽卡机会", msg)
 
             # 开始抽卡
             for i in range(remain_chances):
                 # 每次抽卡至少间隔4~8秒的时间
                 getcard_result, _ = await asyncio.gather(
                     api.LotteryGetCard(rule),
-                    aio_randomSleep(4, 8),)
+                    aio_randomSleep(4, 8),
+                )
                 if isinstance(getcard_result, ApiResults.Error):
-                    log(f'  第{i+1}次抽卡: {getcard_result}', msg)
+                    log(f"  第{i+1}次抽卡: {getcard_result}", msg)
                 else:
                     log(
-                        f'  第{i+1}次抽卡: {getcard_result.name}, 类型: {getcard_result.card_type}', msg)
+                        f"  第{i+1}次抽卡: {getcard_result.name}, 类型: {getcard_result.card_type}",
+                        msg,
+                    )
 
             # 获取卡片数量
             info = await api.GetCollectCardEntity(rule)
@@ -136,9 +181,8 @@ class PUPU:
                 return msg
             else:
                 for card in info.already_get:
-                    log(f' {card.name}: {card.have_count}张')
-                log(
-                    f' 可合成{info.can_composite_count}张 {info.already_get[0].name}', msg)
+                    log(f" {card.name}: {card.have_count}张")
+                log(f" 可合成{info.can_composite_count}张 {info.already_get[0].name}", msg)
                 if info.can_composite_count:
                     unk = await api.PostCompositeCard(rule)
                     if isinstance(unk, ApiResults.Error):
@@ -170,7 +214,7 @@ class PUPU:
                     if isinstance(result, ApiResults.Error):
                         log(result)
                         continue
-                    log(f'  消耗了1张 {card.name}')
+                    log(f"  消耗了1张 {card.name}")
                     if result != lottery_info.lottery.id:
                         # FIXME 不应该
                         log(f"断言不满足 {result} != {lottery_info.lottery.id}", msg)
@@ -180,15 +224,15 @@ class PUPU:
                         aio_randomSleep(4, 8),
                     )
                     if isinstance(lottery_result, ApiResults.Error):
-                        log(f'  第{c}次抽奖: {lottery_result}', msg)
+                        log(f"  第{c}次抽奖: {lottery_result}", msg)
                     else:
-                        log(f'  第{c}次抽奖: {lottery_result.prize.name}', msg)
+                        log(f"  第{c}次抽奖: {lottery_result.prize.name}", msg)
                     c += 1
 
         return msg
 
 
-@ check(run_script_name="朴朴集卡", run_script_expression="pupu")
+@check(run_script_name="朴朴集卡", run_script_expression="pupu")
 def main(*args, **kwargs):
     return asyncio.run(PUPU(check_item=kwargs.get("value")).main())
 

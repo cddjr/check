@@ -122,6 +122,20 @@ class TaskStatus(MyIntEnum):
     Receive = 30
 
 
+class TaskRewardType(MyIntEnum):
+    Credit = 0
+    Coupon = 10
+    GiftCard = 20
+    Lottery = 30
+    Card = 40
+    BetNum = 50
+    Cash = 60
+    打榜积分 = 70
+    拼桌食材 = 80
+    红包 = 90
+    NoReward = 255
+
+
 class SPREAD_TAG(MyIntEnum):
     UNKNOWN = -1  # 不限
     NORMAL_PRODUCT = 0
@@ -156,6 +170,23 @@ class COLLECT_CARD_STATUS(MyIntEnum):
     NOT_START = 10
     PROCESSING = 20
     FINISHED = 30
+
+
+class HideTaskType(MyIntEnum):
+    Null = 0
+    More = 10
+    List = 20
+
+
+class PAPER_CONTENT_TYPE(MyIntEnum):
+    MANUAL_INPUT = 0
+    REF_INPUT = 10
+    REALATION_INPUT = 15
+    ROBOT_GREETING = 20
+    ROBOT_RECOM = 30
+    ROBOT_ANSWER = 40
+    KEYWORD_INTENTION = 50
+    REMIND_ORDER = 60
 
 
 class ERROR_CODE(MyIntEnum):
@@ -266,14 +297,27 @@ class PItem:
 
 
 @dataclass
+class PPageRule:
+    activity_id: str
+    action_type: ActionTYPE
+    task_type: TaskType
+    skim_time: int  # 浏览多少秒
+
+
+@dataclass
+class PAnswerRule:
+    answer_is_done: bool
+
+
+@dataclass
 class PTask:
     task_id: str
     task_name: str  # 每日打卡
-    activity_id: str
-    task_type: TaskType
-    action_type: ActionTYPE
-    skim_time: int  # 浏览多少秒
     task_status: TaskStatus
+    reward_type: TaskRewardType
+    link_id: str
+    page_rule: Optional[PPageRule] = None  # 浏览型任务
+    answer_rule: Optional[PAnswerRule] = None  # 答题型任务
 
 
 @dataclass
@@ -345,7 +389,9 @@ class PDiscountRule:
 
     @property
     def tips(self):
-        return f"满{self.condition_amount/100}减{self.discount_amount/100}{self.name or ''}"
+        return (
+            f"满{self.condition_amount/100}减{self.discount_amount/100}{self.name or ''}"
+        )
 
 
 @dataclass
@@ -370,14 +416,37 @@ class PShareUser:
     time: int  # 抢包时间
 
 
+@dataclass
+class PAnswerOptions:
+    sort: int
+    name: str
+    # score:Optional[int] = None
+    selected: Optional[int] = 0
+
+
+@dataclass
+class PQuestion:
+    id: str
+    question_title: str
+    question_notice: str
+    question_type: int
+    is_must: int
+    is_random: int
+    sort: int
+    start_score_desc: str
+    end_score_desc: str
+    options: list[PAnswerOptions]
+    content_type: PAPER_CONTENT_TYPE
+    option_limit: int
+    option_min_limit: int
+    question_id: Optional[str] = None
+
+
 class ApiResults:
     class Error:
-
         __slots__ = ("code", "msg", "func_name")
 
-        def __init__(self,
-                     json: Optional[dict],
-                     func_name: Optional[str] = None):
+        def __init__(self, json: Optional[dict], func_name: Optional[str] = None):
             if json:
                 self.code = json.get("errcode")
                 self.msg = json.get("errmsg", "")
@@ -388,19 +457,19 @@ class ApiResults:
             self.func_name = func_name or getframe(1).f_code.co_name
 
         def __str__(self) -> str:
-            return f'{self.func_name} 失败: code={self.code}, msg={self.msg}'
+            return f"{self.func_name} 失败: code={self.code}, msg={self.msg}"
 
     class Exception(Error):
-        __slots__ = ("exception")
+        __slots__ = "exception"
 
-        def __init__(self,
-                     func_name: Optional[str] = None):
-            super().__init__(json=None,
-                             func_name=func_name or getframe(1).f_code.co_name)
+        def __init__(self, func_name: Optional[str] = None):
+            super().__init__(
+                json=None, func_name=func_name or getframe(1).f_code.co_name
+            )
             self.exception = format_exc()
 
         def __str__(self) -> str:
-            return f'{self.func_name} 异常: {self.exception}'
+            return f"{self.func_name} 异常: {self.exception}"
 
     @dataclass
     class TokenRefreshed:
@@ -498,6 +567,18 @@ class ApiResults:
         user_list: list[PShareUser]
         discount: Optional[PDiscountRule]
         available: bool
+
+    @dataclass
+    class AnswerResult:
+        question_id: str
+        standard: str  # 标准答案
+        result: bool  # 是否答对
+
+    @dataclass
+    class Questionnaire:
+        id: str
+        time_start_answer: int
+        questions: list[PQuestion]
 
 
 class HttpMethod(Enum):

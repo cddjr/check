@@ -20,7 +20,6 @@ server_date_updating = False
 
 
 class ApiBase(object):
-
     # __slots__ = ("__session", "__receiver")
 
     def __init__(self, device_id: str):
@@ -39,11 +38,18 @@ class ApiBase(object):
                 # 系统繁忙，请稍后再试。
                 return False
             return True
-        self.__session = RetryClient(raise_for_status=True,
-                                     retry_options=JitterRetry(attempts=3, evaluate_response_callback=RetryWhenBusy))
+
+        self.__session = RetryClient(
+            raise_for_status=True,
+            retry_options=JitterRetry(
+                attempts=3, evaluate_response_callback=RetryWhenBusy
+            ),
+        )
         self.__session._client.headers["Accept"] = "application/json, text/plain, */*"
         self.__session._client.headers["Accept-Encoding"] = "gzip;q=1.0, compress;q=0.5"
-        self.__session._client.headers["Accept-Language"] = "zh-Hans-CN;q=1.0, ja-CN;q=0.9, en-CN;q=0.8"
+        self.__session._client.headers[
+            "Accept-Language"
+        ] = "zh-Hans-CN;q=1.0, ja-CN;q=0.9, en-CN;q=0.8"
         self.__session._client.headers["pp-version"] = "2023018200"
         self.__session._client.headers["Connection"] = "keep-alive"
 
@@ -141,17 +147,17 @@ class ApiBase(object):
             if isinstance(result, ApiResults.Error):
                 log(result)
                 if server_date_diff is None:
-                    return int(time()*1000)
+                    return int(time() * 1000)
             else:
                 server_date_diff = result
-        return int(time()*1000 + server_date_diff)
+        return int(time() * 1000 + server_date_diff)
 
     @staticmethod
     def TryGetServerTime():
         """类似GetServerTime"""
         global server_date_diff
         if server_date_diff is not None:
-            return int(time()*1000 + server_date_diff)
+            return int(time() * 1000 + server_date_diff)
         return None
 
     async def ComputeServerTimeDiff(self):
@@ -161,8 +167,10 @@ class ApiBase(object):
                 HttpMethod.kGet,
                 "https://j1.pupuapi.com/client/base/data",
                 client=ClientType.kWeb,
-                headers={"Origin": "https://ma.pupumall.com",
-                         "Referer": "https://ma.pupumall.com/"}
+                headers={
+                    "Origin": "https://ma.pupumall.com",
+                    "Referer": "https://ma.pupumall.com/",
+                },
             )
             if obj["errcode"] == 0:
                 data = obj["data"]
@@ -178,10 +186,16 @@ class ApiBase(object):
         except Exception:
             return ApiResults.Exception()
 
-    async def _SendRequest(self, method: HttpMethod, url: str,
-                           client=ClientType.kNative,
-                           headers: Optional[dict] = None,
-                           params: Optional[dict] = None, data=None, json=None):
+    async def _SendRequest(
+        self,
+        method: HttpMethod,
+        url: str,
+        client=ClientType.kNative,
+        headers: Optional[dict] = None,
+        params: Optional[dict] = None,
+        data=None,
+        json=None,
+    ):
         """发起一个HTTP请求"""
         req_headers = {}
         if client == ClientType.kNative:
@@ -199,8 +213,13 @@ class ApiBase(object):
         if headers:
             req_headers.update(headers)
         async with self.__session.request(
-            ssl=False, method=method.value, url=url, headers=req_headers,
-            params=params, data=data, json=json
+            ssl=False,
+            method=method.value,
+            url=url,
+            headers=req_headers,
+            params=params,
+            data=data,
+            json=json,
         ) as response:
             # server_date = response.headers.getone("Date", None)
             # if server_date:
@@ -211,9 +230,13 @@ class ApiBase(object):
 
 
 class Api(ApiBase):
-
-    def __init__(self, device_id: str, refresh_token: str,
-                 access_token: Optional[str], expires_in: Optional[int]):
+    def __init__(
+        self,
+        device_id: str,
+        refresh_token: str,
+        access_token: Optional[str],
+        expires_in: Optional[int],
+    ):
         if not (device_id and refresh_token):
             raise ValueError("参数没有正确设置")
         super().__init__(device_id=device_id)
@@ -263,7 +286,7 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kPut,
                 "https://cauth.pupuapi.com/clientauth/user/refresh_token",
-                json={"refresh_token": self.__refresh_token}
+                json={"refresh_token": self.__refresh_token},
             )
             if obj["errcode"] == 0:
                 data = obj["data"]
@@ -271,16 +294,18 @@ class Api(ApiBase):
                 self.user_id = data.get("user_id")
                 # refresh_token 在临期时会更新 我们需要保存新的token 否则很快就得重新登录
                 prev_refresh_token = self.__refresh_token
-                self.__refresh_token = data.get(
-                    "refresh_token") or self.__refresh_token
-                self.__expires_in = int(data.get('expires_in') or 0)
+                self.__refresh_token = data.get("refresh_token") or self.__refresh_token
+                self.__expires_in = int(data.get("expires_in") or 0)
                 self._nickname = data.get("nick_name")
-                return ApiResults.TokenRefreshed(refresh_token=self.__refresh_token,
-                                                 access_expires=self.__expires_in,
-                                                 changed=self.__refresh_token != prev_refresh_token)
+                return ApiResults.TokenRefreshed(
+                    refresh_token=self.__refresh_token,
+                    access_expires=self.__expires_in,
+                    changed=self.__refresh_token != prev_refresh_token,
+                )
             else:
-                if obj["errcode"] == 403 \
-                        or (obj["errcode"] != 200099 and obj["errcode"] in range(200000, 300000)):
+                if obj["errcode"] == 403 or (
+                    obj["errcode"] != 200099 and obj["errcode"] in range(200000, 300000)
+                ):
                     self.__refresh_token = None
                 return ApiResults.Error(json=obj)
         except Exception:
@@ -291,7 +316,7 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kGet,
                 "https://j1.pupuapi.com/client/caccount/user/suid",
-                params={"device_id": self.device_id}
+                params={"device_id": self.device_id},
             )
             if obj["errcode"] == 0:
                 self.su_id = obj["data"]
@@ -318,8 +343,7 @@ class Api(ApiBase):
         """
         try:
             obj = await self._SendRequest(
-                HttpMethod.kGet,
-                "https://cauth.pupuapi.com/clientauth/user/info"
+                HttpMethod.kGet, "https://cauth.pupuapi.com/clientauth/user/info"
             )
             if obj["errcode"] == 0:
                 data = obj["data"]
@@ -335,8 +359,7 @@ class Api(ApiBase):
         """获得收货地址"""
         try:
             obj = await self._SendRequest(
-                HttpMethod.kGet,
-                "https://j1.pupuapi.com/client/account/receivers"
+                HttpMethod.kGet, "https://j1.pupuapi.com/client/account/receivers"
             )
             if obj["errcode"] == 0:
                 data = obj["data"]
@@ -344,19 +367,24 @@ class Api(ApiBase):
                 info = None
                 for r in data:
                     # r["is_in_service"] 意味地址是否可以配送
-                    if r.get("is_default") or int(r.get("time_last_order") or 0) > time_last_order:
+                    if (
+                        r.get("is_default")
+                        or int(r.get("time_last_order") or 0) > time_last_order
+                    ):
                         time_last_order = int(r.get("time_last_order") or 0)
                         place = r["place"]
                         info = PReceiverInfo(
                             id=str(r["id"]),
-                            address=r["address"], room_num=r["building_room_num"],
+                            address=r["address"],
+                            room_num=r["building_room_num"],
                             lng_x=place.get("lng_x") or r["lng_x"],
                             lat_y=place.get("lat_y") or r["lat_y"],
-                            receiver_name=r["name"], phone_number=r["mobile"],
-                            store_id=place.get(
-                                "service_store_id") or r["service_store_id"],
+                            receiver_name=r["name"],
+                            phone_number=r["mobile"],
+                            store_id=place.get("service_store_id")
+                            or r["service_store_id"],
                             place_id=place["id"],
-                            city_zip=place.get("store_city_zip") or 0
+                            city_zip=place.get("store_city_zip") or 0,
                         )
                         self.user_id = r.get("user_id") or self.user_id
                         info.place_zip = int(place.get("zip") or info.city_zip)
@@ -365,11 +393,13 @@ class Api(ApiBase):
                         room_num = r.get("room_num")
                         if place.get("have_building", False):
                             place_building = r.get("place_building")
-                            if place_building and place_building.get("is_deleted", False) == False:
-                                building_name = place_building.get(
-                                    "building_name")
+                            if (
+                                place_building
+                                and place_building.get("is_deleted", False) == False
+                            ):
+                                building_name = place_building.get("building_name")
                         if building_name and room_num:
-                            info.room_num = f'{building_name} {room_num}'
+                            info.room_num = f"{building_name} {room_num}"
 
                         if filter:
                             # 配置了地址过滤
@@ -399,14 +429,15 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kPost,
                 "https://j1.pupuapi.com/client/game/sign/v2",
-                params={"city_zip": self.receiver.city_zip,
-                        "supplement_id": ""},
-                client=ClientType.kWeb)
+                params={"city_zip": self.receiver.city_zip, "supplement_id": ""},
+                client=ClientType.kWeb,
+            )
             if obj["errcode"] == 0:
                 data = obj["data"]
                 # 朴分
-                return ApiResults.SignIn(coin=data["daily_sign_coin"],
-                                         explanation=data["reward_explanation"])
+                return ApiResults.SignIn(
+                    coin=data["daily_sign_coin"], explanation=data["reward_explanation"]
+                )
             else:
                 return ApiResults.Error(json=obj)
         except Exception:
@@ -416,8 +447,7 @@ class Api(ApiBase):
         """获得本周连续签到的天数"""
         try:
             obj = await self._SendRequest(
-                HttpMethod.kGet,
-                "https://j1.pupuapi.com/client/game/sign/period_info"
+                HttpMethod.kGet, "https://j1.pupuapi.com/client/game/sign/period_info"
             )
             if obj["errcode"] == 0:
                 data = obj["data"]
@@ -431,8 +461,7 @@ class Api(ApiBase):
         """朴分下单抽大奖"""
         try:
             obj = await self._SendRequest(
-                HttpMethod.kGet,
-                "https://j1.pupuapi.com/client/coin/unclaimed/config"
+                HttpMethod.kGet, "https://j1.pupuapi.com/client/coin/unclaimed/config"
             )
             if obj["errcode"] == 0:
                 data = obj["data"]
@@ -446,8 +475,7 @@ class Api(ApiBase):
         """可领取的朴分IDs"""
         try:
             obj = await self._SendRequest(
-                HttpMethod.kGet,
-                "https://j1.pupuapi.com/client/coin/unclaimed/list"
+                HttpMethod.kGet, "https://j1.pupuapi.com/client/coin/unclaimed/list"
             )
             if obj["errcode"] == 0:
                 data = obj["data"]
@@ -461,8 +489,7 @@ class Api(ApiBase):
         """领取朴分"""
         try:
             obj = await self._SendRequest(
-                HttpMethod.kPost,
-                f"https://j1.pupuapi.com/client/coin/unclaimed/{id}"
+                HttpMethod.kPost, f"https://j1.pupuapi.com/client/coin/unclaimed/{id}"
             )
             # obj["errcode"] == 400000 # 已领取
             if obj["errcode"] == 0:
@@ -473,22 +500,33 @@ class Api(ApiBase):
         except Exception:
             return ApiResults.Exception()
 
-    async def GetBanner(self, link_type: BANNER_LINK_TYPE, position_types: Optional[list[Union[int, str]]] = None):
+    async def GetBanner(
+        self,
+        link_type: BANNER_LINK_TYPE,
+        position_types: Optional[list[Union[int, str]]] = None,
+    ):
         assert not self.receiver.id_empty
         try:
             co_req = self._SendRequest(
                 HttpMethod.kGet,
                 "https://j1.pupuapi.com/client/marketing/banner/v7",
-                params={"position_types": ",".join(str(p) for p in position_types) if position_types else -1,
-                        "store_id": self.receiver.store_id})
+                params={
+                    "position_types": ",".join(str(p) for p in position_types)
+                    if position_types
+                    else -1,
+                    "store_id": self.receiver.store_id,
+                },
+            )
             now, obj = await aio_gather(self.GetServerTime(), co_req)
             if obj["errcode"] == 0:
                 link_ids = set[str]()
                 banners = []
                 data = obj["data"]
                 for item in data:
-                    if "link_type" in item \
-                            and BANNER_LINK_TYPE(item["link_type"]) == link_type:
+                    if (
+                        "link_type" in item
+                        and BANNER_LINK_TYPE(item["link_type"]) == link_type
+                    ):
                         time_open = item.get("time_open") or 0
                         time_close = item.get("time_close") or (now + 60_000)
                         if now < time_open or now + 60_000 > time_close:
@@ -498,10 +536,12 @@ class Api(ApiBase):
                         if link_id not in link_ids:
                             # 避免重复
                             link_ids.add(link_id)
-                            banners.append(PBanner(
-                                title=item.get("title") or item.get("name"),
-                                link_id=link_id,
-                            ))
+                            banners.append(
+                                PBanner(
+                                    title=item.get("title") or item.get("name"),
+                                    link_id=link_id,
+                                )
+                            )
                 return ApiResults.Banner(banners)
             else:
                 return ApiResults.Error(json=obj)
@@ -514,7 +554,8 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kGet,
                 f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{id}/element_configuration",
-                client=ClientType.kWeb)
+                client=ClientType.kWeb,
+            )
             if obj["errcode"] == 0:
                 data = obj["data"]
                 lottery = PLotteryInfo(
@@ -524,11 +565,16 @@ class Api(ApiBase):
                 )
                 for prize in data.get("prize_info") or []:
                     # 解析奖品
-                    if "prize_level" in prize and "prize_type" in prize \
-                            and "prize_name" in prize:
-                        p = PPrize(level=prize["prize_level"],
-                                   name=prize["prize_name"],
-                                   type=RewardType(prize["prize_type"]))
+                    if (
+                        "prize_level" in prize
+                        and "prize_type" in prize
+                        and "prize_name" in prize
+                    ):
+                        p = PPrize(
+                            level=prize["prize_level"],
+                            name=prize["prize_name"],
+                            type=RewardType(prize["prize_type"]),
+                        )
                         lottery.prizes[p.level] = p
                 task_system_link = data.get("task_system_link") or {}
                 lottery.task_system_link_id = task_system_link.get("link_id")
@@ -549,7 +595,8 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kGet,
                 f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{lottery.id}/user_chances",
-                client=ClientType.kWeb)
+                client=ClientType.kWeb,
+            )
             if obj["errcode"] == 0:
                 num = obj["data"].get("remain_chance_num") or 0
                 return ApiResults.UserLotteryInfo(remain_chances=num)
@@ -560,8 +607,11 @@ class Api(ApiBase):
 
     async def GetTaskGroupsData(self, lottery: Union[PLotteryInfo, PCollectCardRule]):
         """获取任务列表"""
-        task_id = lottery.task_system_link_id if isinstance(
-            lottery, PLotteryInfo) else lottery.card_get_task_id
+        task_id = (
+            lottery.task_system_link_id
+            if isinstance(lottery, PLotteryInfo)
+            else lottery.card_get_task_id
+        )
         if not task_id:
             return ApiResults.TaskGroupsData([])
         try:
@@ -569,32 +619,63 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kGet,
                 f"https://j1.pupuapi.com/client/game/task_system/user_tasks/task_groups/{task_id}",
-                client=ClientType.kWeb)
+                client=ClientType.kWeb,
+            )
             if obj["errcode"] == 0:
                 data = obj["data"]
+                hide_type = HideTaskType(data.get("hide_task_type") or 0)
+                if hide_type != HideTaskType.List:
+                    print(f"检测到非List的任务列表 HideTaskType {hide_type}")
                 tasks_json: list = data.get("tasks") or []
                 for task_json in tasks_json:
-                    page_task_rule = task_json.get("page_task_rule")
-                    if not page_task_rule:
-                        # 忽略非浏览型任务
+                    if "task_status" not in task_json:
                         continue
-                    if "task_status" not in page_task_rule:
-                        continue
-                    # if page_task_rule["action_type"] != ActionTYPE.BROWSE:
-                    #    continue
                     try:
-                        tasks.append(PTask(
-                            task_name=task_json["task_name"],
-                            task_id=page_task_rule["task_id"],
-                            skim_time=page_task_rule["skim_time"],
-                            activity_id=page_task_rule["activity_id"],
-                            task_type=TaskType(
-                                page_task_rule.get("task_type") or 0),
-                            action_type=ActionTYPE(
-                                page_task_rule["action_type"]),
-                            task_status=TaskStatus(
-                                page_task_rule["task_status"]),
-                        ))
+                        base_behavior_event_target_code = int(
+                            task_json.get("base_behavior_event_target_code") or 0
+                        )
+                        page_url = answer_rule = None
+                        link_id = task_json.get("link_id") or ""
+                        link_type = task_json.get("link_type") or 0
+                        page_task_rule = task_json.get("page_task_rule")
+                        if page_task_rule:
+                            # 浏览型任务
+                            page_url = PPageRule(
+                                skim_time=page_task_rule["skim_time"],
+                                activity_id=page_task_rule["activity_id"],
+                                task_type=TaskType(
+                                    page_task_rule.get("task_type") or 0
+                                ),
+                                action_type=ActionTYPE(page_task_rule["action_type"]),
+                            )
+                            # if page_url.action_type != ActionTYPE.BROWSE:
+                            #    continue
+                        elif link_id and (
+                            base_behavior_event_target_code == 2701
+                            or base_behavior_event_target_code == 2702
+                        ):
+                            # base_behavior_event_target_code = 2501 ==> WORLD_CUP_BETS
+                            # # link_type == 550
+                            # 答题任务
+                            answer_rule = PAnswerRule(
+                                answer_is_done=task_json.get("answer_is_done") or True
+                            )
+                        else:
+                            # 其它任务暂不支持
+                            continue
+                        tasks.append(
+                            PTask(
+                                task_name=task_json["task_name"],
+                                task_id=task_json["task_id"],
+                                task_status=TaskStatus(task_json["task_status"]),
+                                page_rule=page_url,
+                                answer_rule=answer_rule,
+                                link_id=link_id,
+                                reward_type=TaskRewardType(
+                                    task_json.get("reward_type") or 255
+                                ),
+                            )
+                        )
                     except Exception:
                         print(f"警告: 解析任务时遇到异常 {ApiResults.Exception()}")
                 return ApiResults.TaskGroupsData(tasks)
@@ -605,26 +686,111 @@ class Api(ApiBase):
 
     async def PostPageTaskComplete(self, task: PTask):
         """完成浏览任务"""
+        if not task.page_rule:
+            return ApiResults.Error(json=None)
         # 此任务从何时完成
         time_end: int = await self.GetServerTime() - randint(1, 8) * 1000
         # 此任务从何时开始
-        time_from: int = time_end - task.skim_time * 1000 - randint(1, 20)
+        time_from: int = time_end - task.page_rule.skim_time * 1000 - randint(1, 20)
 
         json = {
-            "activity_id": task.activity_id,
-            "task_type": task.task_type,
-            "action_type": task.action_type,
+            "activity_id": task.page_rule.activity_id,
+            "task_type": task.page_rule.task_type,
+            "action_type": task.page_rule.action_type,
             "task_id": task.task_id,
             "time_from": time_from,
-            "time_end": time_end}
+            "time_end": time_end,
+        }
         try:
             obj = await self._SendRequest(
                 HttpMethod.kPost,
                 "https://j1.pupuapi.com/client/game/task_system/user_tasks/page_task_complete",
                 json=json,
-                client=ClientType.kWeb)
+                client=ClientType.kWeb,
+            )
             if obj["errcode"] == 0:
                 return ApiResults.TaskCompleted()
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def GetQuestionnaire(self, task: PTask):
+        """查询问卷题目"""
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kGet,
+                f"https://j1.pupuapi.com/client/user_behavior/questionnaire/papers/{task.link_id}",
+                client=ClientType.kWeb,
+            )
+            if obj["errcode"] == 0:
+                data = obj["data"]
+                time_start_answer = data["time_start_answer"]
+                questions = json_codec.decode(
+                    data["paper_info"].get("questions") or [], list[PQuestion]
+                )
+                questionnaire = ApiResults.Questionnaire(
+                    id=data["paper_info"]["id"],
+                    time_start_answer=time_start_answer,
+                    questions=questions,
+                )
+                for q in questionnaire.questions:
+                    q.question_id = q.id
+                return questionnaire
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def SubmitQuestionnaire(self, questionnaire: ApiResults.Questionnaire):
+        """提交问卷"""
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kPost,
+                "https://j1.pupuapi.com/client/user_behavior/questionnaire/papers",
+                json={
+                    "time_start_answer": questionnaire.time_start_answer,
+                    "paper_id": questionnaire.id,
+                    "answer_commits": json_codec.encode(questionnaire.questions),
+                },
+                client=ClientType.kWeb,
+            )
+            if obj["errcode"] == 0:
+                return bool(obj.get("data") or False)
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def GetQuestionnaireAnswerResult(self, task: PTask):
+        """查询问题回答结果"""
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kGet,
+                f"https://j1.pupuapi.com/client/user_behavior/questionnaire/papers/{task.link_id}/answer_result",
+                client=ClientType.kWeb,
+            )
+            if obj["errcode"] == 0:
+                result: list[ApiResults.AnswerResult] = []
+                data = obj["data"]
+                question_answers = data.get("question_answers") or []
+                for question in question_answers:
+                    question_id = question["question_id"]
+                    answers = question.get("answer_options") or []
+                    correct = False
+                    standard = ""
+                    for answer in answers:
+                        is_standard = answer.get("is_standard") or False
+                        if is_standard:
+                            standard = answer["name"]
+                            correct = answer.get("selected") == 1
+                            break
+                    result.append(
+                        ApiResults.AnswerResult(
+                            question_id=question_id, standard=standard, result=correct
+                        )
+                    )
+                return result
             else:
                 return ApiResults.Error(json=obj)
         except Exception:
@@ -635,22 +801,28 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kGet,
                 f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{lottery.id}/obtain_chance_entrance",
-                client=ClientType.kWeb)
+                client=ClientType.kWeb,
+            )
             if obj["errcode"] == 0:
                 data = obj["data"]
                 coin_balance = int(data.get("coin_balance") or 0)
                 entrances: list[PChanceEntrance] = []
                 for item in data.get("chance_obtain_entrance") or []:
-                    if "code" in item and "attend_count" in item \
-                            and "limit_count" in item and "gain_num" in item \
-                            and "target_value" in item:
+                    if (
+                        "code" in item
+                        and "attend_count" in item
+                        and "limit_count" in item
+                        and "gain_num" in item
+                        and "target_value" in item
+                    ):
                         pitem = PChanceEntrance(
                             type=CHANCE_OBTAIN_TYPE(item["code"]),
                             title=item.get("title") or "未知",
                             attend_count=item["attend_count"],
                             limit_count=item["limit_count"],
                             target_value=int(item["target_value"]),
-                            gain_num=int(item["gain_num"]))
+                            gain_num=int(item["gain_num"]),
+                        )
                         if pitem.attend_count >= pitem.limit_count:
                             # 达到限制量 跳过
                             print(f" {pitem.title} 达到限制 {pitem.limit_count} 跳过")
@@ -668,10 +840,10 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kPost,
                 f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{lottery.id}/coin_exchange",
-                params={"lng_x": self.receiver.lng_x,
-                        "lat_y": self.receiver.lat_y},
+                params={"lng_x": self.receiver.lng_x, "lat_y": self.receiver.lat_y},
                 json={},
-                client=ClientType.kWeb)
+                client=ClientType.kWeb,
+            )
             if obj["errcode"] == 0:
                 entrance.attend_count += 1
                 return ApiResults.CoinExchanged(entrance.gain_num)
@@ -686,10 +858,10 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kPost,
                 f"https://j1.pupuapi.com/client/game/custom_lottery/activities/{lottery.id}/lottery",
-                params={"lng_x": self.receiver.lng_x,
-                        "lat_y": self.receiver.lat_y},
+                params={"lng_x": self.receiver.lng_x, "lat_y": self.receiver.lat_y},
                 json={},
-                client=ClientType.kWeb)
+                client=ClientType.kWeb,
+            )
             if obj["errcode"] == 0:
                 prize = lottery.prizes[obj["data"]["prize_level"]]
                 return ApiResults.LotteryResult(prize)
@@ -705,7 +877,7 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kGet,
                 f"https://j1.pupuapi.com/client/user_behavior/product_collection/store/{self.receiver.store_id}/products",
-                params={"page": page, "size": page_size}
+                params={"page": page, "size": page_size},
             )
             if obj["errcode"] == 0:
                 data = obj["data"]
@@ -720,20 +892,24 @@ class Api(ApiBase):
                         product_id=p["product_id"],
                         store_product_id=p["id"],
                         purchase_type=PURCHASE_TYPE(
-                            p.get("purchase_type") or PURCHASE_TYPE.GENERAL),
+                            p.get("purchase_type") or PURCHASE_TYPE.GENERAL
+                        ),
                         spread_tag=SPREAD_TAG(
-                            p.get("spread_tag") or SPREAD_TAG.NORMAL_PRODUCT),
+                            p.get("spread_tag") or SPREAD_TAG.NORMAL_PRODUCT
+                        ),
                         stock_quantity=p.get("stock_quantity") or 0,
                         order_remarks=p.get("order_remarks") or [],
                     )
                     if product.spread_tag == SPREAD_TAG.FLASH_SALE_PRODUCT:
                         flash_sale_info = p.get("flash_sale_info") or {}
-                        progress_rate: float = flash_sale_info.get(
-                            "progress_rate") or 0.0
+                        progress_rate: float = (
+                            flash_sale_info.get("progress_rate") or 0.0
+                        )
                         if flash_sale_info and progress_rate < 1.0:
                             # 限购N件
-                            product.quantity_limit = flash_sale_info.get(
-                                "quantity_each_person_limit") or 1
+                            product.quantity_limit = (
+                                flash_sale_info.get("quantity_each_person_limit") or 1
+                            )
                     products.append(product)
                 return ApiResults.ProductCollections(total_count, products)
             else:
@@ -741,7 +917,7 @@ class Api(ApiBase):
         except Exception:
             return ApiResults.Exception()
 
-    async def GetUsableCoupons(self,  type: DiscountType, products: list[PProduct]):
+    async def GetUsableCoupons(self, type: DiscountType, products: list[PProduct]):
         """获得可用的优惠券"""
         assert not self.receiver.id_empty
         try:
@@ -759,7 +935,7 @@ class Api(ApiBase):
                     "spread_tag": pi.spread_tag,
                     "count": pi.selected_count,
                     "remark": pi.remark,
-                    "gift_belong_to_store_product_ids": []
+                    "gift_belong_to_store_product_ids": [],
                 }
                 order_items.append(obj)
             json = {
@@ -773,7 +949,7 @@ class Api(ApiBase):
                 HttpMethod.kPost,
                 "https://j1.pupuapi.com/client/account/discount",
                 params={"discount_type": type},
-                json=json
+                json=json,
             )
             if obj["errcode"] == 0:
                 ids = []
@@ -787,12 +963,16 @@ class Api(ApiBase):
                         # 超时赔付券，券前金额满8减8元；
                         # content:None|str = rule.get("content")
                         ids.append(id)
-                        rules.append(PDiscountRule(
-                            id=rule.get("discount_id") or "",
-                            type=DiscountType(
-                                rule.get("discount_type") or DiscountType.ABSOLUTE),
-                            condition_amount=rule.get("condition_amount") or 0,
-                            discount_amount=rule.get("discount_amount") or 0))
+                        rules.append(
+                            PDiscountRule(
+                                id=rule.get("discount_id") or "",
+                                type=DiscountType(
+                                    rule.get("discount_type") or DiscountType.ABSOLUTE
+                                ),
+                                condition_amount=rule.get("condition_amount") or 0,
+                                discount_amount=rule.get("discount_amount") or 0,
+                            )
+                        )
                 return ApiResults.UsableCoupons(coupons=ids, rules=rules)
             else:
                 return ApiResults.Error(json=obj)
@@ -816,10 +996,13 @@ class Api(ApiBase):
             co_req = self._SendRequest(
                 HttpMethod.kPost,
                 "https://j1.pupuapi.com/client/deliverytime/v4",
-                params={"place_id": self.receiver.place_id,
-                        "scene_type": 0,
-                        "store_id": self.receiver.store_id},
-                json=json)
+                params={
+                    "place_id": self.receiver.place_id,
+                    "scene_type": 0,
+                    "store_id": self.receiver.store_id,
+                },
+                json=json,
+            )
             now, obj = await aio_gather(self.GetServerTime(), co_req)
             if obj["errcode"] == 0:
                 dtime_type = DeliveryTimeType.IMMEDIATE
@@ -838,8 +1021,11 @@ class Api(ApiBase):
                 cur_date = now + dtime_real * 60_000
                 cur_date = min(max(cur_date, date_start), date_end)
 
-                date_limit = min(max(date + start_hours * 3600_000, date_start) +
-                                 dtime_real * 60_000, date_end)
+                date_limit = min(
+                    max(date + start_hours * 3600_000, date_start)
+                    + dtime_real * 60_000,
+                    date_end,
+                )
                 dtime_promise = max(cur_date, date_limit)
                 return ApiResults.DeliveryTime(dtime_type, dtime_promise)
             else:
@@ -847,10 +1033,20 @@ class Api(ApiBase):
         except Exception:
             return ApiResults.Exception()
 
-    async def CreateOrder(self, pay_type: int, coupons: Optional[list[str]], products: list[PProduct],
-                          dtime_type: DeliveryTimeType, dtime_promise: int):
+    async def CreateOrder(
+        self,
+        pay_type: int,
+        coupons: Optional[list[str]],
+        products: list[PProduct],
+        dtime_type: DeliveryTimeType,
+        dtime_promise: int,
+    ):
         """创建订单"""
-        assert not self.receiver.id_empty and self.receiver.address and self.receiver.receiver_name
+        assert (
+            not self.receiver.id_empty
+            and self.receiver.address
+            and self.receiver.receiver_name
+        )
         order_items = []
         for pi in products:
             obj = {
@@ -902,14 +1098,20 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kPost,
                 "https://j1.pupuapi.com/client/order/unifiedorder/v2",
-                json=json)
+                json=json,
+            )
             if obj["errcode"] == 0:
                 data = obj["data"]
                 return ApiResults.OrderCreated(id=data["id"])
-            elif dtime_type == DeliveryTimeType.IMMEDIATE and obj["errmsg"].find("重新选择"):
+            elif dtime_type == DeliveryTimeType.IMMEDIATE and obj["errmsg"].find(
+                "重新选择"
+            ):
                 # 亲，该订单期望送达时间不在我们配送时间范围内，请重新选择送达时间
-                rr: Union[ApiResults.Error, ApiResults.OrderCreated] = await self.CreateOrder(
-                    pay_type, coupons, products, DeliveryTimeType.RESERVE, dtime_promise)
+                rr: Union[
+                    ApiResults.Error, ApiResults.OrderCreated
+                ] = await self.CreateOrder(
+                    pay_type, coupons, products, DeliveryTimeType.RESERVE, dtime_promise
+                )
                 return rr
             else:
                 return ApiResults.Error(json=obj)
@@ -922,7 +1124,7 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kGet,
                 "https://j1.pupuapi.com/client/order/orders/list/v2",
-                params={"page": page, "size": 20, "type": -1}
+                params={"page": page, "size": 20, "type": -1},
             )
             if obj["errcode"] == 0:
                 orders = []
@@ -956,12 +1158,13 @@ class Api(ApiBase):
             obj = await self._SendRequest(
                 HttpMethod.kGet,
                 "https://j1.pupuapi.com/client/account/discount/wechat_index",
-                params={"id": share.share_id})
+                params={"id": share.share_id},
+            )
             # ClientType.kMicroMsg
             if obj["errcode"] == 0:
                 data = obj["data"]
                 enabled: bool = data.get("enabled") or True
-                status = SHARE_STATUS(data.get('status') or SHARE_STATUS.ERROR)
+                status = SHARE_STATUS(data.get("status") or SHARE_STATUS.ERROR)
                 best_luck: bool = data.get("best_luck") or False  # 我是否最佳
                 reentry: bool = data["reentry"]  # 已领取过该优惠券了哦
                 rule = data.get("rule") or {}  # 我抢到的优惠券 可能为空
@@ -987,16 +1190,22 @@ class Api(ApiBase):
                         discount_amount=rule["discount_amount"],
                         name=rule["name"],
                     )
-                users = [PShareUser(
-                    avatar=item.get("avatar"),
-                    name=item["name"],
-                    best=item["max"],
-                    time=item["time"],
-                ) for item in data.get("list") or []]
+                users = [
+                    PShareUser(
+                        avatar=item.get("avatar"),
+                        name=item["name"],
+                        best=item["max"],
+                        time=item["time"],
+                    )
+                    for item in data.get("list") or []
+                ]
                 return ApiResults.WxDiscountShare(
-                    best_luck, reentry, users,
+                    best_luck,
+                    reentry,
+                    users,
                     discount=discount_rule,
-                    available=status == SHARE_STATUS.NORMAL and enabled)
+                    available=status == SHARE_STATUS.NORMAL and enabled,
+                )
             else:
                 return ApiResults.Error(json=obj)
         except Exception:
@@ -1047,7 +1256,7 @@ class Api(ApiBase):
             return ApiResults.Exception()
 
     async def LotteryGetCard(self, rule: PCollectCardRule):
-        '''抽卡'''
+        """抽卡"""
         try:
             obj = await self._SendRequest(
                 HttpMethod.kGet,
@@ -1062,7 +1271,7 @@ class Api(ApiBase):
             return ApiResults.Exception()
 
     async def PostCompositeCard(self, rule: PCollectCardRule):
-        '''合成卡片'''
+        """合成卡片"""
         try:
             obj = await self._SendRequest(
                 HttpMethod.kPost,
@@ -1079,7 +1288,7 @@ class Api(ApiBase):
             return ApiResults.Exception()
 
     async def DeleteExpendCardEntity(self, card: PCollectCard):
-        '''消耗卡片兑换抽奖机会'''
+        """消耗卡片兑换抽奖机会"""
         try:
             assert card.rule_card_id
             obj = await self._SendRequest(
@@ -1097,11 +1306,12 @@ class Api(ApiBase):
 
 
 class Client(Api):
-    __slots__ = ("_config",
-                 "_config_dict",
-                 "_saved",
-                 "_refresh_token_user_specified",
-                 )
+    __slots__ = (
+        "_config",
+        "_config_dict",
+        "_saved",
+        "_refresh_token_user_specified",
+    )
 
     def __init__(self, device_id: str, refresh_token: str):
         super().__init__(device_id, refresh_token, None, None)
@@ -1110,8 +1320,9 @@ class Client(Api):
         self._config = GetScriptConfig("pupu.json")
         self._config_dict = {}
         if self._config and not path.exists(self._config.config_file):
-            if (old_database := GetScriptConfig("pupu")) \
-                    and (keys := old_database.get_key_for_toml(old_database.config_file)):
+            if (old_database := GetScriptConfig("pupu")) and (
+                keys := old_database.get_key_for_toml(old_database.config_file)
+            ):
                 # 从toml迁移至json
                 for k in keys:
                     v = old_database.get_value_2(k)
@@ -1124,16 +1335,19 @@ class Client(Api):
         if not force and self._config_dict:
             return True
         self._config_dict = self._config.get_value_2(self.device_id) or {}
-        refresh_token_prev_spec = self._config_dict.get(
-            "refresh_token_user_specified")
+        refresh_token_prev_spec = self._config_dict.get("refresh_token_user_specified")
 
-        if not self._refresh_token_user_specified \
-                or self._refresh_token_user_specified != refresh_token_prev_spec:
+        if (
+            not self._refresh_token_user_specified
+            or self._refresh_token_user_specified != refresh_token_prev_spec
+        ):
             # 说明用户手动修改了token 以用户的为准
             self.refresh_token = self._refresh_token_user_specified
         else:
-            self.refresh_token = self._config_dict.get(
-                "refresh_token_lastest") or self._refresh_token_user_specified
+            self.refresh_token = (
+                self._config_dict.get("refresh_token_lastest")
+                or self._refresh_token_user_specified
+            )
 
         self.access_token = self._config_dict.get("access_token")
         self.expires_in = self._config_dict.get("access_expires")
@@ -1145,7 +1359,8 @@ class Client(Api):
             store_id=self._config_dict.get("store_id") or "",
             place_id=self._config_dict.get("place_id") or "",
             city_zip=int(self._config_dict.get("city_zip") or 0),
-            place_zip=int(self._config_dict.get("place_zip") or 0))
+            place_zip=int(self._config_dict.get("place_zip") or 0),
+        )
 
         self._nickname = self._config_dict.get("nickname")
         self._avatar = self._config_dict.get("avatar")
@@ -1155,7 +1370,9 @@ class Client(Api):
         if not self._config:
             return False
         self._config_dict["nickname"] = self.nickname
-        self._config_dict["refresh_token_user_specified"] = self._refresh_token_user_specified
+        self._config_dict[
+            "refresh_token_user_specified"
+        ] = self._refresh_token_user_specified
         self._config_dict["refresh_token_lastest"] = self.refresh_token
         self._config_dict["access_token"] = self.access_token
         self._config_dict["access_expires"] = self.expires_in
@@ -1171,8 +1388,9 @@ class Client(Api):
         self._saved = True
         return True
 
-    async def InitializeToken(self, address_filter: Optional[str] = None,
-                              force_update_receiver: bool = True):
+    async def InitializeToken(
+        self, address_filter: Optional[str] = None, force_update_receiver: bool = True
+    ):
         """初始化"""
         self.LoadConfig(force=True)
 

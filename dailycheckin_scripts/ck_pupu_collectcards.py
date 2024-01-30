@@ -115,6 +115,9 @@ class PUPU:
                     """
                     TODO 答题任务 采集题库
                     """
+                    if task.answer_rule.answer_is_done:
+                        # 已回答 忽略
+                        continue
                     questionnaire, _ = await asyncio.gather(
                         api.GetQuestionnaire(task),
                         aio_randomSleep(2, 5),
@@ -136,7 +139,7 @@ class PUPU:
                                         answer = True
                             elif q.id == "f7f45e2a-e750-4325-91e0-4d0a6e210fcd":
                                 for options in q.options:
-                                    if options.name == "月初1-2日":
+                                    if options.name == "月末3天":
                                         options.selected = 1
                                         answer = True
                             elif q.id == "26b505d5-5918-4655-a946-b1448a7376a3":

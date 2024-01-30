@@ -134,6 +134,31 @@ class PUPU:
                                     if options.name == "月中13-16日":
                                         options.selected = 1
                                         answer = True
+                            elif q.id == "f7f45e2a-e750-4325-91e0-4d0a6e210fcd":
+                                for options in q.options:
+                                    if options.name == "月初1-2日":
+                                        options.selected = 1
+                                        answer = True
+                            elif q.id == "26b505d5-5918-4655-a946-b1448a7376a3":
+                                for options in q.options:
+                                    if options.name == "年":
+                                        options.selected = 1
+                                        answer = True
+                            elif q.id == "7f2c9a9c-2201-47c1-889f-51d84fb8e301":
+                                for options in q.options:
+                                    if options.name == "小年朝":
+                                        options.selected = 1
+                                        answer = True
+                            elif q.id == "8b9695e5-5443-4acf-97ed-cc1821bfb711":
+                                for options in q.options:
+                                    if options.name == "初五":
+                                        options.selected = 1
+                                        answer = True
+                            elif q.id == "790dbeac-1fc2-4a47-bab3-9b8c7f00e5cf":
+                                for options in q.options:
+                                    if options.name == "大年初一":
+                                        options.selected = 1
+                                        answer = True
                             else:
                                 print(q)
                         if answer:

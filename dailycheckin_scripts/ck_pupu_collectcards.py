@@ -126,44 +126,63 @@ class PUPU:
                         log(questionnaire)
                     else:
                         answer = False
+
+                        def _answer(q: PQuestion, id: str, answer: str):
+                            if q.id != id:
+                                return False
+                            for options in q.options:
+                                if options.name == answer:
+                                    options.selected = 1
+                                    return True
+                            return False
+
                         for q in questionnaire.questions:
-                            if q.id == "8d133804-64cc-4ae4-aacf-e4a0d55c8182":
-                                for options in q.options:
-                                    if options.name == "车厘子":
-                                        options.selected = 1
-                                        answer = True
-                            elif q.id == "0c1da1e8-50e8-40b0-8e0d-43496996c928":
-                                for options in q.options:
-                                    if options.name == "月中13-16日":
-                                        options.selected = 1
-                                        answer = True
-                            elif q.id == "f7f45e2a-e750-4325-91e0-4d0a6e210fcd":
-                                for options in q.options:
-                                    if options.name == "月末3天":
-                                        options.selected = 1
-                                        answer = True
-                            elif q.id == "26b505d5-5918-4655-a946-b1448a7376a3":
-                                for options in q.options:
-                                    if options.name == "年":
-                                        options.selected = 1
-                                        answer = True
-                            elif q.id == "7f2c9a9c-2201-47c1-889f-51d84fb8e301":
-                                for options in q.options:
-                                    if options.name == "小年朝":
-                                        options.selected = 1
-                                        answer = True
-                            elif q.id == "8b9695e5-5443-4acf-97ed-cc1821bfb711":
-                                for options in q.options:
-                                    if options.name == "初五":
-                                        options.selected = 1
-                                        answer = True
-                            elif q.id == "790dbeac-1fc2-4a47-bab3-9b8c7f00e5cf":
-                                for options in q.options:
-                                    if options.name == "大年初一":
-                                        options.selected = 1
-                                        answer = True
-                            else:
-                                print(q)
+                            answer = _answer(
+                                q, "8d133804-64cc-4ae4-aacf-e4a0d55c8182", "车厘子"
+                            )
+                            if answer:
+                                break
+                            answer = _answer(
+                                q, "0c1da1e8-50e8-40b0-8e0d-43496996c928", "月中13-16日"
+                            )
+                            if answer:
+                                break
+                            answer = _answer(
+                                q, "f7f45e2a-e750-4325-91e0-4d0a6e210fcd", "月末3天"
+                            )
+                            if answer:
+                                break
+                            answer = _answer(
+                                q, "26b505d5-5918-4655-a946-b1448a7376a3", "年"
+                            )
+                            if answer:
+                                break
+                            answer = _answer(
+                                q, "7f2c9a9c-2201-47c1-889f-51d84fb8e301", "小年朝"
+                            )
+                            if answer:
+                                break
+                            answer = _answer(
+                                q, "8b9695e5-5443-4acf-97ed-cc1821bfb711", "初五"
+                            )
+                            if answer:
+                                break
+                            answer = _answer(
+                                q, "790dbeac-1fc2-4a47-bab3-9b8c7f00e5cf", "大年初一"
+                            )
+                            if answer:
+                                break
+                            answer = _answer(
+                                q, "1c5bca23-5b40-43c2-ab22-61fbc376786c", "划龙舟"
+                            )
+                            if answer:
+                                break
+                            answer = _answer(
+                                q, "91330186-de0d-4017-b337-0f2c2215f4c2", "新年纳余庆，嘉节号长春"
+                            )
+                            if answer:
+                                break
+                            print(q)
                         if answer:
                             succ, _ = await asyncio.gather(
                                 api.SubmitQuestionnaire(questionnaire),

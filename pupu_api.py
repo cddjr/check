@@ -658,7 +658,7 @@ class Api(ApiBase):
                             # # link_type == 550
                             # 答题任务
                             answer_rule = PAnswerRule(
-                                answer_is_done=task_json.get("answer_is_done") or True
+                                answer_is_done=task_json.get("answer_is_done", True)
                             )
                         else:
                             # 其它任务暂不支持
@@ -1163,7 +1163,7 @@ class Api(ApiBase):
             # ClientType.kMicroMsg
             if obj["errcode"] == 0:
                 data = obj["data"]
-                enabled: bool = data.get("enabled") or True
+                enabled: bool = data.get("enabled", True)
                 status = SHARE_STATUS(data.get("status") or SHARE_STATUS.ERROR)
                 best_luck: bool = data.get("best_luck") or False  # 我是否最佳
                 reentry: bool = data["reentry"]  # 已领取过该优惠券了哦

@@ -49,7 +49,7 @@ class PUPU:
                 raise SystemExit("没有启用")
 
             self._lottery = bool(collect_cards.get("lottery", False))
-            self._keep_cards = int(self.check_item.get("keep_cards", 1))
+            self._keep_cards = int(collect_cards.get("keep_cards", 1))
 
             msg += await self.CollectCards()
         except Exception:

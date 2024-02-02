@@ -125,17 +125,17 @@ class PUPU:
                     if isinstance(questionnaire, ApiResults.Error):
                         log(questionnaire)
                     else:
-                        answer = False
 
                         def _answer(q: PQuestion, id: str, answer: str):
                             if q.id != id:
-                                return False
+                                return None
                             for options in q.options:
                                 if options.name == answer:
                                     options.selected = 1
-                                    return True
-                            return False
+                                    return q.question_title
+                            return None
 
+                        answer = None
                         for q in questionnaire.questions:
                             answer = _answer(
                                 q, "8d133804-64cc-4ae4-aacf-e4a0d55c8182", "车厘子"
@@ -178,7 +178,9 @@ class PUPU:
                             if answer:
                                 break
                             answer = _answer(
-                                q, "91330186-de0d-4017-b337-0f2c2215f4c2", "新年纳余庆，嘉节号长春"
+                                q,
+                                "91330186-de0d-4017-b337-0f2c2215f4c2",
+                                "新年纳余庆，嘉节号长春",
                             )
                             if answer:
                                 break
@@ -191,9 +193,9 @@ class PUPU:
                             if isinstance(succ, ApiResults.Error):
                                 log(succ)
                             elif succ:
-                                log(f"    {task.task_name}: 已提交", msg)
+                                log(f"{answer}: 已提交", msg)
                                 continue
-                        log(f"    {task.task_name}: 未提交")
+                        log(f"题目未收录，答题失败", msg)
 
             # 获取抽卡次数
             await aio_randomSleep(2, 3)
@@ -229,7 +231,10 @@ class PUPU:
             else:
                 for card in info.already_get:
                     log(f" {card.name}: {card.have_count}张")
-                log(f" 可合成{info.can_composite_count}张 {info.already_get[0].name}", msg)
+                log(
+                    f" 可合成{info.can_composite_count}张 {info.already_get[0].name}",
+                    msg,
+                )
                 if info.can_composite_count:
                     unk = await api.PostCompositeCard(rule)
                     if isinstance(unk, ApiResults.Error):

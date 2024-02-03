@@ -34,6 +34,20 @@ class PUPU:
     def __init__(self, check_item) -> None:
         self.check_item: dict = check_item
 
+    # 已知的题库
+    QUESTIONS = {
+        "8d133804-64cc-4ae4-aacf-e4a0d55c8182": "车厘子",
+        "0c1da1e8-50e8-40b0-8e0d-43496996c928": "月中13-16日",
+        "f7f45e2a-e750-4325-91e0-4d0a6e210fcd": "月末3天",
+        "26b505d5-5918-4655-a946-b1448a7376a3": "年",
+        "7f2c9a9c-2201-47c1-889f-51d84fb8e301": "小年朝",
+        "8b9695e5-5443-4acf-97ed-cc1821bfb711": "初五",
+        "790dbeac-1fc2-4a47-bab3-9b8c7f00e5cf": "大年初一",
+        "1c5bca23-5b40-43c2-ab22-61fbc376786c": "划龙舟",
+        "91330186-de0d-4017-b337-0f2c2215f4c2": "新年纳余庆，嘉节号长春",
+        "440544e9-2ac2-444f-bf6d-e241e2bc2afb": "生蚝",
+    }
+
     async def main(self):
         msg: list[str] = []
         try:
@@ -125,67 +139,20 @@ class PUPU:
                     if isinstance(questionnaire, ApiResults.Error):
                         log(questionnaire)
                     else:
-
-                        def _answer(q: PQuestion, id: str, answer: str):
-                            if q.id != id:
-                                return None
-                            for options in q.options:
-                                if options.name == answer:
-                                    options.selected = 1
-                                    return q.question_title
-                            return None
-
-                        answer = None
+                        question = None
                         for q in questionnaire.questions:
-                            answer = _answer(
-                                q, "8d133804-64cc-4ae4-aacf-e4a0d55c8182", "车厘子"
-                            )
+                            answer = self.QUESTIONS.get(q.id)
                             if answer:
-                                break
-                            answer = _answer(
-                                q, "0c1da1e8-50e8-40b0-8e0d-43496996c928", "月中13-16日"
-                            )
-                            if answer:
-                                break
-                            answer = _answer(
-                                q, "f7f45e2a-e750-4325-91e0-4d0a6e210fcd", "月末3天"
-                            )
-                            if answer:
-                                break
-                            answer = _answer(
-                                q, "26b505d5-5918-4655-a946-b1448a7376a3", "年"
-                            )
-                            if answer:
-                                break
-                            answer = _answer(
-                                q, "7f2c9a9c-2201-47c1-889f-51d84fb8e301", "小年朝"
-                            )
-                            if answer:
-                                break
-                            answer = _answer(
-                                q, "8b9695e5-5443-4acf-97ed-cc1821bfb711", "初五"
-                            )
-                            if answer:
-                                break
-                            answer = _answer(
-                                q, "790dbeac-1fc2-4a47-bab3-9b8c7f00e5cf", "大年初一"
-                            )
-                            if answer:
-                                break
-                            answer = _answer(
-                                q, "1c5bca23-5b40-43c2-ab22-61fbc376786c", "划龙舟"
-                            )
-                            if answer:
-                                break
-                            answer = _answer(
-                                q,
-                                "91330186-de0d-4017-b337-0f2c2215f4c2",
-                                "新年纳余庆，嘉节号长春",
-                            )
-                            if answer:
-                                break
-                            print(q)
-                        if answer:
+                                for options in q.options:
+                                    if options.name == answer:
+                                        question = q
+                                        options.selected = 1
+                                        break
+                                else:
+                                    answer = None
+                            if not answer:
+                                print(q)
+                        if question:
                             succ, _ = await asyncio.gather(
                                 api.SubmitQuestionnaire(questionnaire),
                                 aio_randomSleep(2, 5),
@@ -193,9 +160,9 @@ class PUPU:
                             if isinstance(succ, ApiResults.Error):
                                 log(succ)
                             elif succ:
-                                log(f"{answer}: 已提交", msg)
+                                log(f"成功答题: {question.question_title}", msg)
                                 continue
-                        log(f"题目未收录，答题失败", msg)
+                        log(f"答题失败", msg)
 
             # 获取抽卡次数
             await aio_randomSleep(2, 3)

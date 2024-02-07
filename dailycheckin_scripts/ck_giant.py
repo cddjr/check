@@ -16,7 +16,7 @@ class GIANT:
         self.session = requests.Session()
         self.session.verify = False
         adapter = HTTPAdapter()
-        adapter.max_retries = Retry(connect=3, read=3, allowed_methods=False)
+        adapter.max_retries = Retry(connect=3, read=3, allowed_methods=None)
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 

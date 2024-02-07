@@ -225,6 +225,9 @@ class PUPU:
             c = 1
             # 开始消耗卡片去抽奖(规则每日最多3次)
             for card in info.already_get:
+                if card.card_type == 20:
+                    # 240207 别把合成卡给抽了，会报错 :)
+                    continue
                 if card.have_count is None:
                     continue
                 if card.have_count <= self._keep_cards:

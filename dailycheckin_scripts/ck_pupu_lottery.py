@@ -162,14 +162,18 @@ class PUPU:
                 if task.task_status != TaskStatus.Undone:
                     continue
                 if task.page_rule:
-                    # 每个任务至少间隔2~5秒的时间
-                    _, task_result = await asyncio.gather(
-                        aio_randomSleep(2, 5), api.PostPageTaskComplete(task)
-                    )
-                    if isinstance(task_result, ApiResults.Error):
-                        log(task_result)
-                    else:
-                        log(f"    {task.task_name}: 已完成")
+                    co_task = api.PostPageTaskComplete(task)
+
+                elif task.target_code == 3001:
+                    co_task = api.ClockTask(info.lottery, task)
+                else:
+                    continue
+                # 每个任务至少间隔2~5秒的时间
+                _, task_result = await asyncio.gather(aio_randomSleep(2, 5), co_task)
+                if isinstance(task_result, ApiResults.Error):
+                    log(task_result)
+                else:
+                    log(f"    {task.task_name}: 已完成")
 
         # 接着尝试朴分兑换
         exchange_count = 0

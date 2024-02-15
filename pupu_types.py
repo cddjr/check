@@ -316,6 +316,7 @@ class PTask:
     task_status: TaskStatus
     reward_type: TaskRewardType
     link_id: str
+    target_code: int
     page_rule: Optional[PPageRule] = None  # 浏览型任务
     answer_rule: Optional[PAnswerRule] = None  # 答题型任务
 
@@ -385,13 +386,13 @@ class PDiscountRule:
     type: DiscountType
     condition_amount: int  # 6900
     discount_amount: int  # 700 满69减7元
-    name: Optional[str] = None  # 230617新增用于检测是不是垃圾券，比如 “朴朴分享券（冷藏冷冻专用）”
+    name: Optional[str] = (
+        None  # 230617新增用于检测是不是垃圾券，比如 “朴朴分享券（冷藏冷冻专用）”
+    )
 
     @property
     def tips(self):
-        return (
-            f"满{self.condition_amount/100}减{self.discount_amount/100}{self.name or ''}"
-        )
+        return f"满{self.condition_amount/100}减{self.discount_amount/100}{self.name or ''}"
 
 
 @dataclass

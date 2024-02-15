@@ -47,9 +47,9 @@ class ApiBase(object):
         )
         self.__session._client.headers["Accept"] = "application/json, text/plain, */*"
         self.__session._client.headers["Accept-Encoding"] = "gzip;q=1.0, compress;q=0.5"
-        self.__session._client.headers[
-            "Accept-Language"
-        ] = "zh-Hans-CN;q=1.0, ja-CN;q=0.9, en-CN;q=0.8"
+        self.__session._client.headers["Accept-Language"] = (
+            "zh-Hans-CN;q=1.0, ja-CN;q=0.9, en-CN;q=0.8"
+        )
         self.__session._client.headers["pp-version"] = "2023018200"
         self.__session._client.headers["Connection"] = "keep-alive"
 
@@ -413,7 +413,9 @@ class Api(ApiBase):
                             break
                 if not info:
                     if filter:
-                        raise ValueError(f"没有符合筛选条件的收货地址, 当前条件`{filter}`")
+                        raise ValueError(
+                            f"没有符合筛选条件的收货地址, 当前条件`{filter}`"
+                        )
                     else:
                         raise ValueError("没有收货地址")
                 self.receiver = info
@@ -511,9 +513,11 @@ class Api(ApiBase):
                 HttpMethod.kGet,
                 "https://j1.pupuapi.com/client/marketing/banner/v7",
                 params={
-                    "position_types": ",".join(str(p) for p in position_types)
-                    if position_types
-                    else -1,
+                    "position_types": (
+                        ",".join(str(p) for p in position_types)
+                        if position_types
+                        else -1
+                    ),
                     "store_id": self.receiver.store_id,
                 },
             )
@@ -581,7 +585,9 @@ class Api(ApiBase):
                 if lottery.task_system_link_id:
                     link_type = BANNER_LINK_TYPE(task_system_link["link_type"])
                     if link_type != BANNER_LINK_TYPE.USER_TASK:
-                        print(f"警告: 抽奖任务遇到了不识别的link_type '{link_type.name}'")
+                        print(
+                            f"警告: 抽奖任务遇到了不识别的link_type '{link_type.name}'"
+                        )
                         lottery.task_system_link_id = None
                 return ApiResults.LotteryInfo(lottery)
             else:
@@ -660,6 +666,9 @@ class Api(ApiBase):
                             answer_rule = PAnswerRule(
                                 answer_is_done=task_json.get("answer_is_done", True)
                             )
+                        elif base_behavior_event_target_code == 3001:
+                            # 打卡任务
+                            pass
                         else:
                             # 其它任务暂不支持
                             continue
@@ -671,6 +680,7 @@ class Api(ApiBase):
                                 page_rule=page_url,
                                 answer_rule=answer_rule,
                                 link_id=link_id,
+                                target_code=base_behavior_event_target_code,
                                 reward_type=TaskRewardType(
                                     task_json.get("reward_type") or 255
                                 ),
@@ -679,6 +689,24 @@ class Api(ApiBase):
                     except Exception:
                         print(f"警告: 解析任务时遇到异常 {ApiResults.Exception()}")
                 return ApiResults.TaskGroupsData(tasks)
+            else:
+                return ApiResults.Error(json=obj)
+        except Exception:
+            return ApiResults.Exception()
+
+    async def ClockTask(self, lottery: PLotteryInfo, task: PTask):
+        """完成打卡任务"""
+        if task.target_code != 3001:
+            return ApiResults.Error(json=None)
+        try:
+            obj = await self._SendRequest(
+                HttpMethod.kPost,
+                f"https://j1.pupuapi.com/client/game/task_system/user_tasks/task/{lottery.task_system_link_id}/{task.task_id}/clock",
+                client=ClientType.kWeb,
+            )
+            if obj["errcode"] == 0:
+                # reward_type = obj["data"].get("receive_reward_type")
+                return ApiResults.TaskCompleted()
             else:
                 return ApiResults.Error(json=obj)
         except Exception:
@@ -1107,10 +1135,14 @@ class Api(ApiBase):
                 "重新选择"
             ):
                 # 亲，该订单期望送达时间不在我们配送时间范围内，请重新选择送达时间
-                rr: Union[
-                    ApiResults.Error, ApiResults.OrderCreated
-                ] = await self.CreateOrder(
-                    pay_type, coupons, products, DeliveryTimeType.RESERVE, dtime_promise
+                rr: Union[ApiResults.Error, ApiResults.OrderCreated] = (
+                    await self.CreateOrder(
+                        pay_type,
+                        coupons,
+                        products,
+                        DeliveryTimeType.RESERVE,
+                        dtime_promise,
+                    )
                 )
                 return rr
             else:
@@ -1370,9 +1402,9 @@ class Client(Api):
         if not self._config:
             return False
         self._config_dict["nickname"] = self.nickname
-        self._config_dict[
-            "refresh_token_user_specified"
-        ] = self._refresh_token_user_specified
+        self._config_dict["refresh_token_user_specified"] = (
+            self._refresh_token_user_specified
+        )
         self._config_dict["refresh_token_lastest"] = self.refresh_token
         self._config_dict["access_token"] = self.access_token
         self._config_dict["access_expires"] = self.expires_in

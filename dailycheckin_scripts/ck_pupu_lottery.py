@@ -165,7 +165,7 @@ class PUPU:
                     co_task = api.PostPageTaskComplete(task)
 
                 elif task.target_code == 3001:
-                    co_task = api.ClockTask(info.lottery, task)
+                    co_task = api.ClockInTask(info.lottery, task)
                 else:
                     continue
                 # 每个任务至少间隔2~5秒的时间
@@ -180,7 +180,7 @@ class PUPU:
         while True:
             if isinstance(chance_info, ApiResults.Error):
                 # 拉取失败了
-                if chance_info.code != ERROR_CODE.kUnk_400k:
+                if chance_info.code != ERROR_CODE.BUSY:
                     log(chance_info, msg)
                 # 直接尝试抽奖
                 _, lottery_msg = await self.__Lottery(api, info)

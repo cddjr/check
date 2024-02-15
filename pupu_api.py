@@ -660,7 +660,10 @@ class Api(ApiBase):
                             base_behavior_event_target_code == 2701
                             or base_behavior_event_target_code == 2702
                         ):
-                            # base_behavior_event_target_code = 2501 ==> WORLD_CUP_BETS
+                            # 2301 ==> CUSTOM_LOTTERY_ASSIST and target_type ==> 302 CUSTOM_LOTTERY
+                            # 2501 ==> WORLD_CUP_BETS
+                            # 2601 ==> CUSTOM_EVENT_TEAM and target_type ==> 310 TEAM_ENTRANCE
+                            # 2801 ==> 开启AppPush权限
                             # # link_type == 550
                             # 答题任务
                             answer_rule = PAnswerRule(
@@ -694,7 +697,7 @@ class Api(ApiBase):
         except Exception:
             return ApiResults.Exception()
 
-    async def ClockTask(self, lottery: PLotteryInfo, task: PTask):
+    async def ClockInTask(self, lottery: PLotteryInfo, task: PTask):
         """完成打卡任务"""
         if task.target_code != 3001:
             return ApiResults.Error(json=None)
@@ -706,6 +709,8 @@ class Api(ApiBase):
             )
             if obj["errcode"] == 0:
                 # reward_type = obj["data"].get("receive_reward_type")
+                #  0 : 手动领奖
+                # 10 : 自动领奖
                 return ApiResults.TaskCompleted()
             else:
                 return ApiResults.Error(json=obj)

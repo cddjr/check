@@ -100,6 +100,7 @@ class RewardType(MyIntEnum):
     PuPoint = 20
     GiftCard = 30
     Sunrise = 40
+    kUnk_60 = 60
 
 
 class ActionTYPE(MyIntEnum):

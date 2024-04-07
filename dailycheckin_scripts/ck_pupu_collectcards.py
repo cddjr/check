@@ -17,7 +17,7 @@ from traceback import format_exc
 
 from pupu_api import Client as PClient
 from pupu_types import *
-from utils import aio_randomSleep, check, log
+from utils import aio_randomSleep, check, log, config_get
 
 assert sys.version_info >= (3, 9)
 
@@ -50,6 +50,15 @@ class PUPU:
         "831946ed-51f2-4cb7-9fe4-af66b82175ba": "月初1-2日",
     }
 
+    def LoadQuestions(self):
+        qlist = config_get().get_value("qa_pupu") or []
+        for q in qlist:
+            id = q.get("id")
+            answer = q.get("answer")
+            if not id or not answer:
+                continue
+            self.QUESTIONS[id] = answer
+
     async def main(self):
         msg: list[str] = []
         try:
@@ -66,6 +75,8 @@ class PUPU:
 
             self._lottery = bool(collect_cards.get("lottery", False))
             self._keep_cards = int(collect_cards.get("keep_cards", 1))
+            
+            self.LoadQuestions()
 
             msg += await self.CollectCards()
         except Exception:

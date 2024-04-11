@@ -34,30 +34,31 @@ class PUPU:
     def __init__(self, check_item) -> None:
         self.check_item: dict = check_item
 
+    @dataclass
+    class Question:
+        id: str
+        keyword: str
+        answer: str
+
     # 已知的题库
-    QUESTIONS = {
-        "8d133804-64cc-4ae4-aacf-e4a0d55c8182": "车厘子",
-        "0c1da1e8-50e8-40b0-8e0d-43496996c928": "月中13-16日",
-        "f7f45e2a-e750-4325-91e0-4d0a6e210fcd": "月末3天",
-        "26b505d5-5918-4655-a946-b1448a7376a3": "年",
-        "7f2c9a9c-2201-47c1-889f-51d84fb8e301": "小年朝",
-        "8b9695e5-5443-4acf-97ed-cc1821bfb711": "初五",
-        "790dbeac-1fc2-4a47-bab3-9b8c7f00e5cf": "大年初一",
-        "1c5bca23-5b40-43c2-ab22-61fbc376786c": "划龙舟",
-        "91330186-de0d-4017-b337-0f2c2215f4c2": "新年纳余庆，嘉节号长春",
-        "440544e9-2ac2-444f-bf6d-e241e2bc2afb": "生蚝",
-        "e936d2a6-eb39-4866-865d-e3b41b94861e": "灶王爷",
-        "831946ed-51f2-4cb7-9fe4-af66b82175ba": "月初1-2日",
-    }
+    QUESTIONS: list[Question] = []
 
     def LoadQuestions(self):
         qlist = config_get().get_value("qa_pupu") or []
         for q in qlist:
-            id = q.get("id")
-            answer = q.get("answer")
-            if not id or not answer:
-                continue
-            self.QUESTIONS[id] = answer
+            id = q.get("id") or ""
+            keyword = q.get("keyword") or ""
+            answer = q.get("answer") or ""
+            if (id or keyword) and answer:
+                self.QUESTIONS.append(PUPU.Question(id, keyword, answer))
+
+    def GetAnswer(self, question: PQuestion):
+        for q in self.QUESTIONS:
+            if q.id and q.id == question.id:
+                return q.answer
+            elif q.keyword and q.keyword in question.question_title:
+                return q.answer
+        return None
 
     async def main(self):
         msg: list[str] = []
@@ -75,7 +76,7 @@ class PUPU:
 
             self._lottery = bool(collect_cards.get("lottery", False))
             self._keep_cards = int(collect_cards.get("keep_cards", 1))
-            
+
             self.LoadQuestions()
 
             msg += await self.CollectCards()
@@ -140,7 +141,7 @@ class PUPU:
                         log(f"    {task.task_name}: 已完成")
                 elif task.answer_rule:
                     """
-                    TODO 答题任务 采集题库
+                    答题任务
                     """
                     if task.answer_rule.answer_is_done:
                         # 已回答 忽略
@@ -154,7 +155,7 @@ class PUPU:
                     else:
                         question = None
                         for q in questionnaire.questions:
-                            answer = self.QUESTIONS.get(q.id)
+                            answer = self.GetAnswer(q)
                             if answer:
                                 for options in q.options:
                                     if options.name == answer:
@@ -210,7 +211,7 @@ class PUPU:
                 return msg
             else:
                 for card in info.already_get:
-                    log(f" {card.name}: {card.have_count}张")
+                    log(f" {card.name}: {card.have_count}张", msg)
                 log(
                     f" 可合成{info.can_composite_count}张 {info.already_get[0].name}",
                     msg,
@@ -261,7 +262,7 @@ class PUPU:
                     if isinstance(lottery_result, ApiResults.Error):
                         log(f"  第{c}次抽奖: {lottery_result}", msg)
                     else:
-                        log(f"  第{c}次抽奖: {lottery_result.prize.name}", msg)
+                        log(f"  第{c}次抽奖: {lottery_result.prize.name}")
                     c += 1
 
         return msg

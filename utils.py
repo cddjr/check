@@ -19,12 +19,18 @@ assert py_version >= (3, 9)
 def pip_install():
     print("正在安装依赖")
     os.system(
-        "pip3 install requests rsa tomli tomli_w beautifulsoup4 fasteners aiohttp aiohttp_retry")
+        "pip3 install requests rsa tomli tomli_w beautifulsoup4 fasteners aiohttp aiohttp_retry typing_extensions"
+    )
+    os.system("pip3 install git+http://github.com/cddjr/json_codec.git --user")
 
 
 try:
     import tomli
     import tomli_w
+    import json_codec
+    import aiohttp
+    import aiohttp_retry
+
     from fasteners.process_lock import InterProcessReaderWriterLock
 
     from checksendNotify import send
@@ -32,6 +38,9 @@ except ModuleNotFoundError:
     pip_install()
     import tomli
     import tomli_w
+    import json_codec
+    import aiohttp
+    import aiohttp_retry
     from fasteners.process_lock import InterProcessReaderWriterLock
 
     from checksendNotify import send
@@ -56,6 +65,7 @@ except ModuleNotFoundError:
 #         with open(to_toml_path, "wb") as f:
 #             tomli_w.dump(json_dict, f)
 
+
 class config_get(object):
     def __init__(self, custom_path=None):
         """
@@ -70,10 +80,10 @@ class config_get(object):
         else:
             self.config_file = custom_path
             self.config_format = self.get_config_format()
-        self.lock_ = InterProcessReaderWriterLock(f'{self.config_file}.lock')
+        self.lock_ = InterProcessReaderWriterLock(f"{self.config_file}.lock")
 
     def get_config_format(self):
-        if self.config_file.endswith('.toml'):
+        if self.config_file.endswith(".toml"):
             return "toml"
         else:
             return "json"
@@ -83,15 +93,15 @@ class config_get(object):
         ql_old = "/ql/config/"
         ql_new = "/ql/data/config/"
         if os.path.isdir(ql_new):
-            print('成功 当前环境为青龙面板v2.12+ 继续执行\n')
+            print("成功 当前环境为青龙面板v2.12+ 继续执行\n")
             return ql_new
         elif os.path.isdir(ql_old):
-            print('成功 当前环境为青龙面板v2.12- 继续执行\n')
+            print("成功 当前环境为青龙面板v2.12- 继续执行\n")
             return ql_old
         else:
             if platform.system() == "Windows":
                 return ""
-            print('失败 请检查环境')
+            print("失败 请检查环境")
             exit(0)
 
     def get_config_file(self):
@@ -121,7 +131,7 @@ class config_get(object):
         :return:
         """
         pattern = re.compile(expression, re.I)
-        real_key = ''
+        real_key = ""
         with self.lock_.read_lock():
             if self.config_format == "toml":
                 for key in self.get_key_for_toml(self.config_file):
@@ -131,7 +141,7 @@ class config_get(object):
                 for key in self.get_key_for_json(self.config_file):
                     if pattern.match(key) is not None:
                         real_key = key
-        if real_key != '':
+        if real_key != "":
             return real_key
         else:
             print("啊哦没有找到")
@@ -164,7 +174,8 @@ class config_get(object):
     def move_configuration_file_new():
         print("移动配置文件")
         os.system(
-            "cp /ql/data/repo/cddjr_check/check.sample.toml /ql/data/config/check.toml")
+            "cp /ql/data/repo/cddjr_check/check.sample.toml /ql/data/config/check.toml"
+        )
 
     @staticmethod
     def get_value_for_toml(toml_path, key):
@@ -189,7 +200,8 @@ class config_get(object):
                     toml_dict = tomli.load(f)
                 except tomli.TOMLDecodeError:
                     print(
-                        f"错误：配置文件 {toml_path} 格式不对\n{traceback.format_exc()}")
+                        f"错误：配置文件 {toml_path} 格式不对\n{traceback.format_exc()}"
+                    )
                     toml_dict = {}
         except OSError:
             toml_dict = {}
@@ -216,7 +228,8 @@ class config_get(object):
                     json_dict = json.load(f)
                 except json.decoder.JSONDecodeError:
                     print(
-                        f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}")
+                        f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}"
+                    )
                     json_dict = {}
         except OSError:
             json_dict = {}
@@ -242,7 +255,8 @@ class config_get(object):
                     return json_dict.get(key)
                 except json.decoder.JSONDecodeError:
                     print(
-                        f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}")
+                        f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}"
+                    )
         except OSError:
             return None
 
@@ -270,14 +284,22 @@ class config_get(object):
                     return json_dict.keys()
                 except json.decoder.JSONDecodeError:
                     print(
-                        f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}")
+                        f"错误：配置文件 {json_path} 格式不对，错误信息{traceback.format_exc()}"
+                    )
                     return []
         except OSError:
             return []
 
 
 class check(object):
-    def __init__(self, run_script_name, run_script_expression, Configuration_flag=False, interval_min=5, interval_max=10):
+    def __init__(
+        self,
+        run_script_name,
+        run_script_expression,
+        Configuration_flag=False,
+        interval_min=5,
+        interval_max=10,
+    ):
         """
         :param run_script_name: 执行脚本的说明
         :param run_script_expression: 需要获取的配置键的re表达式
@@ -307,8 +329,12 @@ class check(object):
                 for value in value_list:
                     num += 1
                     print(f"<----------------账号【{num}】---------------->")
-                    username = value.get('username') or value.get(
-                        'name') or value.get('email') or value.get('phone')
+                    username = (
+                        value.get("username")
+                        or value.get("name")
+                        or value.get("email")
+                        or value.get("phone")
+                    )
                     if not username:
                         username = str(value)[:32] + "..."
                     print(f"获取到的账号信息为:{username}\n")
@@ -319,23 +345,25 @@ class check(object):
                     except IndexError:
                         print("可能是示例格式被运行\n错误信息:")
                         print(f"{traceback.format_exc()}")
-                        push_message += ''
+                        push_message += ""
                     except AttributeError:
-                        print("可能是配置文件的键名出现问题\n"
-                              "例如:在此次更新中什么值得买的键名从smzdm_cookie变成了cookie\n")
+                        print(
+                            "可能是配置文件的键名出现问题\n"
+                            "例如:在此次更新中什么值得买的键名从smzdm_cookie变成了cookie\n"
+                        )
                         print(f"{traceback.format_exc()}")
-                        push_message += ''
+                        push_message += ""
                     except TypeError:
                         print(f"{traceback.format_exc()}")
-                        push_message += ''
+                        push_message += ""
                     except SystemExit as e:
                         # 脚本中执行exit不要影响其它账号的运行
                         print(e)
-                        push_message += ''
+                        push_message += ""
                     except BaseException:
                         # 未知异常，打印调用栈，继续执行下一个账号
                         print(f"{traceback.format_exc()}")
-                        push_message += ''
+                        push_message += ""
                     if self.interval_max > 0 and num < len(value_list):
                         randomSleep(self.interval_min, self.interval_max)
                 send(self.run_script_name, push_message)
@@ -351,7 +379,9 @@ class check(object):
         return wrapper
 
 
-def change_cron_new(cron_file_path="/ql/data/db/database.sqlite", repositories="cddjr_check"):
+def change_cron_new(
+    cron_file_path="/ql/data/db/database.sqlite", repositories="cddjr_check"
+):
     print("尝试修改定时时间")
     os.system(f"cp {cron_file_path} {cron_file_path}.back")
     con = sqlite3.connect(cron_file_path)
@@ -367,7 +397,7 @@ def change_cron_new(cron_file_path="/ql/data/db/database.sqlite", repositories="
     res = cur.fetchall()
     for line in res:
         if line[2].find(repositories) != -1:
-            sql = f" UPDATE Crontabs SET schedule = \"{change_time(line[3])}\" WHERE id = {line[0]}"
+            sql = f' UPDATE Crontabs SET schedule = "{change_time(line[3])}" WHERE id = {line[0]}'
             print(f"任务名称 {line[1]} 修改为{sql}")
             cur.execute(sql)
 
@@ -402,13 +432,13 @@ def change_cron_old(cron_file_path="/ql/db/crontab.db", repositories="cddjr_chec
 
 
 def randomSleep(min=1.0, max=6.0):
-    delay = random.randint(int(min*1000), int(max*1000)) / 1000
+    delay = random.randint(int(min * 1000), int(max * 1000)) / 1000
     # print(f"随机等待{delay}秒...")
     time.sleep(delay)
 
 
 async def aio_randomSleep(min=1.0, max=6.0):
-    delay = random.randint(int(min*1000), int(max*1000)) / 1000
+    delay = random.randint(int(min * 1000), int(max * 1000)) / 1000
     # print(f"随机等待{delay}秒...")
     await aio_sleep(delay)
 
@@ -444,7 +474,7 @@ def GetScriptConfig(filename: str):
 def cookie_to_dic(cookie: str):
     if not cookie:
         return {}
-    return {item.split('=')[0]: item.split('=')[1] for item in cookie.split('; ')}
+    return {item.split("=")[0]: item.split("=")[1] for item in cookie.split("; ")}
 
 
 class MyIntEnum(IntEnum):
@@ -456,8 +486,7 @@ class MyIntEnum(IntEnum):
         Returns member (possibly creating it) if one can be found for value.
         """
         if not isinstance(value, int):
-            raise ValueError("%r is not a valid %s" %
-                             (value, cls.__qualname__))
+            raise ValueError("%r is not a valid %s" % (value, cls.__qualname__))
         new_member = cls.__CreatePseudoMember(value)
         log(f"警告: {cls.__name__} 没有定义 '{value}', 已自动创建")
         return new_member
@@ -469,8 +498,7 @@ class MyIntEnum(IntEnum):
             pseudo_member = int.__new__(cls, value)
             pseudo_member._name_ = str(value)  # 以值作为枚举名 不会有冲突
             pseudo_member._value_ = value
-            pseudo_member = cls._value2member_map_.setdefault(
-                value, pseudo_member)
+            pseudo_member = cls._value2member_map_.setdefault(value, pseudo_member)
         return pseudo_member
 
 
@@ -483,8 +511,7 @@ class MyStrEnum(str, Enum):
         Returns member (possibly creating it) if one can be found for value.
         """
         if not isinstance(value, str):
-            raise ValueError("%r is not a valid %s" %
-                             (value, cls.__qualname__))
+            raise ValueError("%r is not a valid %s" % (value, cls.__qualname__))
         new_member = cls.__CreatePseudoMember(value)
         log(f"警告: {cls.__name__} 没有定义 '{value}', 已自动创建")
         return new_member
@@ -494,10 +521,9 @@ class MyStrEnum(str, Enum):
         pseudo_member = cls._value2member_map_.get(value, None)
         if pseudo_member is None:
             pseudo_member = str.__new__(cls, value)
-            pseudo_member._name_ = f'`{value}`'
+            pseudo_member._name_ = f"`{value}`"
             pseudo_member._value_ = value
-            pseudo_member = cls._value2member_map_.setdefault(
-                value, pseudo_member)
+            pseudo_member = cls._value2member_map_.setdefault(value, pseudo_member)
         return pseudo_member
 
 

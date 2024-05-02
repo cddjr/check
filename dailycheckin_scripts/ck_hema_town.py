@@ -19,12 +19,12 @@ from time import time
 from traceback import format_exc
 from typing import Optional, cast
 
+from utils import GetScriptConfig, MyStrEnum, aio_randomSleep, check, log
 import json_codec
 from aiohttp import ClientResponse
 from aiohttp_retry import JitterRetry, RetryClient
 from yarl import URL
 
-from utils import GetScriptConfig, MyStrEnum, aio_randomSleep, check, log
 
 
 @dataclass

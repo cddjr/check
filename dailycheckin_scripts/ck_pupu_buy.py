@@ -21,11 +21,12 @@ from traceback import format_exc
 from typing import Optional  # 确保兼容<=Python3.9
 
 import ck_pupu_history
-from aiohttp import ClientSession, ClientTimeout
 
 from pupu_api import Client as PClient
 from pupu_types import *
 from utils import check, log, aio_randomSleep
+
+from aiohttp import ClientSession, ClientTimeout
 
 assert sys.version_info >= (3, 9)
 
@@ -39,13 +40,14 @@ class Goods:
 
 class PUPU:
 
-    __slots__ = ("check_item",
-                 "device_id",
-                 "refresh_token",
-                 "_goods",
-                 "_buy",
-                 "_push_key",
-                 )
+    __slots__ = (
+        "check_item",
+        "device_id",
+        "refresh_token",
+        "_goods",
+        "_buy",
+        "_push_key",
+    )
 
     def __init__(self, check_item) -> None:
         self.check_item: dict = check_item
@@ -64,7 +66,7 @@ class PUPU:
 
             self._goods = self.ParseGoods()
             if len(self._goods) > 0:
-                log(f'配置了{len(self._goods)}件商品的价格检测', msg)
+                log(f"配置了{len(self._goods)}件商品的价格检测", msg)
             else:
                 raise SystemExit("没有配置需要检测的商品 跳过")
 
@@ -76,7 +78,7 @@ class PUPU:
             else:
                 msg = []
         except Exception:
-            log(f'失败: 请检查接口 {format_exc()}', msg)
+            log(f"失败: 请检查接口 {format_exc()}", msg)
         finally:
             ck_pupu_history.save_database()
 
@@ -88,20 +90,22 @@ class PUPU:
         products: list[PProduct] = []
         PAGE_SIZE = 10  # 增加分页大小是否会被判定？
         page = 1  # 从第一页开始拉取
-        while (True):
+        while True:
             collections = await api.GetProductCollections(page, PAGE_SIZE)
             if isinstance(collections, ApiResults.Error):
                 log(collections, msg)
                 break
             products.extend(collections.products)
-            if len(products) >= collections.total_count \
-                    or collections.total_count < PAGE_SIZE \
-                    or len(collections.products) < PAGE_SIZE:
+            if (
+                len(products) >= collections.total_count
+                or collections.total_count < PAGE_SIZE
+                or len(collections.products) < PAGE_SIZE
+            ):
                 # 不知朴朴怎么想的 空列表还会下发一个不为零的total_count
                 break
             await aio_randomSleep(0.0, 0.125)
             page += 1
-        log(f'  当前服务器时间: {PClient.TryGetServerTime() or 0}')
+        log(f"  当前服务器时间: {PClient.TryGetServerTime() or 0}")
         price_reduction = 0
         order_items: list[PProduct] = []
         for p in products:
@@ -117,21 +121,25 @@ class PUPU:
                     continue
                 if p.sell_batches:
                     # TODO 以该数组的最低价作为当前价格
-                    log(f'  sell_batches!!: {p.name}')
+                    log(f"  sell_batches!!: {p.name}")
                     pass
                 if p.price > goods.price:
                     # 排除价格高于预期的
-                    log(f'  价格高于预期: {p.name} {p.price/100}元 > {goods.price/100}元')
+                    log(
+                        f"  价格高于预期: {p.name} {p.price/100}元 > {goods.price/100}元"
+                    )
                     continue
-                log(f'价格低于预期: {p.name} {p.price/100}元', msg)
+                log(f"价格低于预期: {p.name} {p.price/100}元", msg)
                 price_reduction += 1
                 if not self._buy or goods.quantity <= 0:
                     continue
                 # p = copy.deepcopy(p)
                 # 计算采购量
-                p.selected_count = min(goods.quantity,
-                                       p.stock_quantity,
-                                       p.quantity_limit or p.stock_quantity)
+                p.selected_count = min(
+                    goods.quantity,
+                    p.stock_quantity,
+                    p.quantity_limit or p.stock_quantity,
+                )
                 # [杀(清洗), 杀(不清洗), 不杀]
                 p.remark = p.order_remarks[0] if p.order_remarks else ""
                 order_items.append(p)
@@ -150,14 +158,14 @@ class PUPU:
                 return msg
             sub_msg, collections, price_reduction, order_items = results
             msg += sub_msg
-            log(f'总共收藏了{len(collections)}件商品')
+            log(f"总共收藏了{len(collections)}件商品")
             if price_reduction <= 0:
                 # 第1次检测没有降价 等待片刻
                 await asyncio.sleep(1.0)
                 # 开始第2次检测 总共3次
                 retry = 2
-                while (True):
-                    log(f'第{retry}次尝试...')
+                while True:
+                    log(f"第{retry}次尝试...")
                     results = await self.DetectProducts(api)
                     if isinstance(results, ApiResults.Error):
                         log(results, msg)
@@ -176,13 +184,13 @@ class PUPU:
                 coupons_result, dtime_result, now = await asyncio.gather(
                     api.GetUsableCoupons(DiscountType.ALL, order_items),
                     api.GetDeliveryTime(order_items, 10),
-                    api.GetServerTime()
+                    api.GetServerTime(),
                 )
                 if isinstance(coupons_result, ApiResults.Error):
                     log(coupons_result, msg)
                     coupons = None
                 else:
-                    log(f'可用{len(coupons_result.coupons)}张优惠券')
+                    log(f"可用{len(coupons_result.coupons)}张优惠券")
                     coupons = coupons_result
                 if isinstance(dtime_result, ApiResults.Error):
                     log(dtime_result, msg)
@@ -194,18 +202,19 @@ class PUPU:
                     coupons=coupons.coupons if coupons else None,
                     products=order_items,
                     dtime_type=dtime.type if dtime else DeliveryTimeType.IMMEDIATE,
-                    dtime_promise=dtime.dtime_promise if dtime else now + 1800_000)
+                    dtime_promise=dtime.dtime_promise if dtime else now + 1800_000,
+                )
                 if isinstance(order_result, ApiResults.Error):
                     log(order_result, msg)
                 else:
-                    log(f'订单创建成功 {order_result.id}', msg)
-                    log(f'当前服务器时间: {PClient.TryGetServerTime() or 0}')
+                    log(f"订单创建成功 {order_result.id}", msg)
+                    log(f"当前服务器时间: {PClient.TryGetServerTime() or 0}")
                     msg += await self.ServerJ("朴朴降价了", f"{order_result.id}")
             elif price_reduction <= 0:
                 pass  # log('无降价', msg)
             else:
-                log('有降价 快去下单吧~', msg)
-            log(f'当前服务器时间: {PClient.TryGetServerTime() or 0}')
+                log("有降价 快去下单吧~", msg)
+            log(f"当前服务器时间: {PClient.TryGetServerTime() or 0}")
         return msg
 
     def ParseGoods(self):
@@ -220,11 +229,13 @@ class PUPU:
             price = goods.get("price")
             if not isinstance(price, (int, float)):
                 continue
-            goods_list.append(Goods(
-                keyword,
-                price=int(price*100),  # 转换为分
-                quantity=int(goods.get("quantity", 0))
-            ))
+            goods_list.append(
+                Goods(
+                    keyword,
+                    price=int(price * 100),  # 转换为分
+                    quantity=int(goods.get("quantity", 0)),
+                )
+            )
         return goods_list
 
     async def ServerJ(self, title: str, content: str):
@@ -236,12 +247,13 @@ class PUPU:
 
         data = {"text": title, "desp": content.replace("\n", "\n\n")}
         if self._push_key.index("SCT") != -1:
-            url = f'https://sctapi.ftqq.com/{self._push_key}.send'
+            url = f"https://sctapi.ftqq.com/{self._push_key}.send"
         else:
-            url = f'https://sc.ftqq.com/${self._push_key}.send'
+            url = f"https://sc.ftqq.com/${self._push_key}.send"
 
-        async with ClientSession(raise_for_status=True,
-                                 timeout=ClientTimeout(total=15)) as session:
+        async with ClientSession(
+            raise_for_status=True, timeout=ClientTimeout(total=15)
+        ) as session:
             async with session.post(url, data=data, ssl=False) as req:
                 datas = await req.json()
                 if datas.get("errno") == 0 or datas.get("code") == 0:

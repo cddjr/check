@@ -7,10 +7,10 @@ import asyncio
 from dataclasses import dataclass
 from traceback import format_exc
 
+from utils import check, log
 import json_codec
 from aiohttp_retry import JitterRetry, RetryClient
 
-from utils import check, log
 
 
 @dataclass

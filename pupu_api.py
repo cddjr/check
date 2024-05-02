@@ -6,12 +6,12 @@ from sys import version_info as py_version
 from time import time
 from typing import Any, Optional, Union  # 确保兼容<=Python3.9
 
+from utils import GetScriptConfig, log
 import json_codec
 from aiohttp import ClientResponse
 from aiohttp_retry import JitterRetry, RetryClient
 
 from pupu_types import *
-from utils import GetScriptConfig, log
 
 assert py_version >= (3, 9)
 

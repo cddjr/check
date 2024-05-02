@@ -11,11 +11,11 @@ from datetime import date
 from time import time
 from traceback import format_exc
 
+from utils import GetScriptConfig, check, log
 import json_codec
 from aiohttp import ClientResponse
 from aiohttp_retry import JitterRetry, RetryClient
 
-from utils import GetScriptConfig, check, log
 
 assert sys.version_info >= (3, 9)
 
@@ -47,9 +47,11 @@ class PT:
         self.database = None
         self.database_dirty = False
         self.records = {}
-        self.header_base = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6.3 Mobile/15E148 Safari/604.1",
-                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Language": "zh-CN,zh-Hans;q=0.9", }
+        self.header_base = {
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6.3 Mobile/15E148 Safari/604.1",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh-Hans;q=0.9",
+        }
 
     async def main(self):
         msg: list[str] = []
@@ -65,12 +67,13 @@ class PT:
             if hdarea_cookie and self.is_sign_needed("hdarea"):
                 co_tasks.append(self.hdarea_sign(hdarea_cookie))
             # 以下使用通用流程处理签到
-            for (tag, host) in [("pttime", "www.pttime.org"),
-                                ("hdzone", "hdfun.me"),
-                                ("ubits", "ubits.club"),
-                                ("hdatmos", "hdatmos.club"),
-                                # TODO ...
-                                ]:
+            for tag, host in [
+                ("pttime", "www.pttime.org"),
+                ("hdzone", "hdfun.me"),
+                ("ubits", "ubits.club"),
+                ("hdatmos", "hdatmos.club"),
+                # TODO ...
+            ]:
                 cookie = self.check_item.get(tag, "")
                 if cookie and self.is_sign_needed(tag):
                     co_tasks.append(self.common_attendance(host, tag, cookie))
@@ -80,7 +83,7 @@ class PT:
             for info in await asyncio.gather(*co_tasks):
                 msg += info
         except Exception:
-            log(f'失败: 请检查接口 {format_exc()}', msg)
+            log(f"失败: 请检查接口 {format_exc()}", msg)
         finally:
             self.save_database()
         return "\n".join(msg)
@@ -124,8 +127,7 @@ class PT:
         record = self.records.get(tag)
         if not record:
             return True
-        time_diff = date.fromtimestamp(time()) \
-            - date.fromtimestamp(record.timestamp)
+        time_diff = date.fromtimestamp(time()) - date.fromtimestamp(record.timestamp)
         if time_diff.days < 1:
             # 按自然日计算不足一天
             return record.can_retry
@@ -136,10 +138,10 @@ class PT:
         TAG = "btschool"
 
         async def try_parse_script(session: RetryClient, resp: ClientResponse):
-            '''
+            """
             学校的CF盾现在降低了安全级别
             可以尝试解析脚本
-            '''
+            """
             text = await resp.text()
             if len(text) > 1024:
                 return text
@@ -150,9 +152,7 @@ class PT:
             pos += len(PATTERN)
             pos2 = text.find(";</script>", pos)
             location = text[pos:pos2]
-            path = location.replace(" ", "") \
-                .replace('"+"', "") \
-                .replace('"', "")
+            path = location.replace(" ", "").replace('"+"', "").replace('"', "")
             url = resp.real_url.with_path(path, encoded=True)
             async with session.get(url, ssl=False) as response:
                 return await response.text()
@@ -163,17 +163,21 @@ class PT:
             header = self.header_base
             header["Referer"] = "https://pt.btschool.club/torrents.php"
             header["Cookie"] = cookie
-            async with RetryClient(raise_for_status=True,
-                                   retry_options=JitterRetry(attempts=3), headers=header) as session:
-                async with session.get("https://pt.btschool.club/index.php?action=addbonus",
-                                       ssl=False) as response:
+            async with RetryClient(
+                raise_for_status=True,
+                retry_options=JitterRetry(attempts=3),
+                headers=header,
+            ) as session:
+                async with session.get(
+                    "https://pt.btschool.club/index.php?action=addbonus", ssl=False
+                ) as response:
                     text = await try_parse_script(session, response)
                     PATTERN = "今天签到您获得"
                     pos = text.find(PATTERN)
                     if pos >= 0:
                         try:
                             pos += len(PATTERN)
-                            moli = int(text[pos:text.find("点魔力值", pos)])
+                            moli = int(text[pos : text.find("点魔力值", pos)])
                             return self.__on_sign_succ(TAG, moli)
                         except:
                             return self.__on_sign_succ(TAG, moli=-1)
@@ -184,7 +188,7 @@ class PT:
                         print(text)
                         return self.__on_sign_err(TAG)
         except Exception:
-            print(f'异常: 请检查接口 {format_exc()}')
+            print(f"异常: 请检查接口 {format_exc()}")
             return self.__on_sign_err(TAG)
         finally:
             print(f"--- {TAG} 流程结束 ---")
@@ -196,12 +200,15 @@ class PT:
             header = self.header_base
             header["Referer"] = "https://hdarea.club/"
             header["Cookie"] = cookie
-            async with RetryClient(raise_for_status=True,
-                                   retry_options=JitterRetry(attempts=3)) as session:
-                async with session.post("https://hdarea.club/sign_in.php",
-                                        data={"action": "sign_in"},
-                                        headers=header, ssl=False
-                                        ) as response:
+            async with RetryClient(
+                raise_for_status=True, retry_options=JitterRetry(attempts=3)
+            ) as session:
+                async with session.post(
+                    "https://hdarea.club/sign_in.php",
+                    data={"action": "sign_in"},
+                    headers=header,
+                    ssl=False,
+                ) as response:
                     text = await response.text()
                     # 已连续签到2天，此次签到您获得了12魔力值奖励!
                     PATTERN = "获得了"
@@ -209,7 +216,7 @@ class PT:
                     if pos >= 0:
                         try:
                             pos += len(PATTERN)
-                            moli = int(text[pos:text.find("魔力值", pos)])
+                            moli = int(text[pos : text.find("魔力值", pos)])
                             return self.__on_sign_succ(TAG, moli)
                         except:
                             return self.__on_sign_succ(TAG, moli=-1)
@@ -221,7 +228,7 @@ class PT:
                         print(text)
                         return self.__on_sign_err(TAG)
         except Exception:
-            print(f'异常: 请检查接口 {format_exc()}')
+            print(f"异常: 请检查接口 {format_exc()}")
             return self.__on_sign_err(TAG)
         finally:
             print(f"--- {TAG} 流程结束 ---")
@@ -231,18 +238,19 @@ class PT:
             print(f"--- {tag} 流程开始 ---")
             header = self.header_base
             header["Cookie"] = cookie
-            async with RetryClient(raise_for_status=True,
-                                   retry_options=JitterRetry(attempts=3)) as session:
-                async with session.get(f"https://{host}/attendance.php",
-                                       headers=header, ssl=False
-                                       ) as response:
+            async with RetryClient(
+                raise_for_status=True, retry_options=JitterRetry(attempts=3)
+            ) as session:
+                async with session.get(
+                    f"https://{host}/attendance.php", headers=header, ssl=False
+                ) as response:
                     text = await response.text()
                     if "签到成功" in text:
                         try:
                             PATTERN = "签到获得 <b>"
                             pos = text.find(PATTERN)
                             pos += len(PATTERN)
-                            moli = int(text[pos:text.find("</b> 个魔力值", pos)])
+                            moli = int(text[pos : text.find("</b> 个魔力值", pos)])
                             return self.__on_sign_succ(tag, moli)
                         except:
                             return self.__on_sign_succ(tag, moli=-1)
@@ -253,32 +261,33 @@ class PT:
                         print(text)
                         return self.__on_sign_err(tag)
         except Exception:
-            print(f'异常: 请检查接口 {format_exc()}')
+            print(f"异常: 请检查接口 {format_exc()}")
             return self.__on_sign_err(tag)
         finally:
             print(f"--- {tag} 流程结束 ---")
 
     def load_database(self):
-        '''读取数据库'''
+        """读取数据库"""
         try:
             if self.database:
                 # 已经读取过数据库
                 return True
             self.database_dirty = False
             self.database = GetScriptConfig("pt_sign.json")
-            self.records = json_codec.decode(self.database.get_value_2("records") or {} if self.database else {},
-                                             dict[str, PT_Record])
+            self.records = json_codec.decode(
+                self.database.get_value_2("records") or {} if self.database else {},
+                dict[str, PT_Record],
+            )
             return True
         except BaseException:
             return False
 
     def save_database(self):
-        '''保存数据库'''
+        """保存数据库"""
         if self.database and self.database_dirty:
             try:
                 self.database_dirty = False
-                self.database.set_value(
-                    "records", json_codec.encode(self.records))
+                self.database.set_value("records", json_codec.encode(self.records))
             except BaseException:
                 return False
         return True

@@ -17,11 +17,11 @@ from enum import IntEnum
 from traceback import format_exc
 from typing import Optional, cast  # 确保兼容<=Python3.9
 
-import json_codec
-
 from pupu_api import Client as PClient
 from pupu_types import ApiResults, PProduct
 from utils import GetScriptConfig, check, log
+
+import json_codec
 
 assert sys.version_info >= (3, 9)
 
@@ -30,7 +30,6 @@ __all__ = [
     "save_database",
     "RecordPrice",
     "OutputHistoryPrice",
-
     "PriceRecord",
     "ProductHistory",
     "Days",
@@ -78,35 +77,35 @@ class ProductHistory:
 
     @property
     def d3_low(self) -> str:
-        return f'{self.d3.low/100}元' if self.d3 else "-"
+        return f"{self.d3.low/100}元" if self.d3 else "-"
 
     @property
     def d6_low(self) -> str:
-        return f'{self.d6.low/100}元' if self.d6 else "-"
+        return f"{self.d6.low/100}元" if self.d6 else "-"
 
     @property
     def d9_low(self) -> str:
-        return f'{self.d9.low/100}元' if self.d9 else "-"
+        return f"{self.d9.low/100}元" if self.d9 else "-"
 
     @property
     def d12_low(self) -> str:
-        return f'{self.d12.low/100}元' if self.d12 else "-"
+        return f"{self.d12.low/100}元" if self.d12 else "-"
 
     @property
     def d3_high(self) -> str:
-        return f'{self.d3.high/100}元' if self.d3 else "-"
+        return f"{self.d3.high/100}元" if self.d3 else "-"
 
     @property
     def d6_high(self) -> str:
-        return f'{self.d6.high/100}元' if self.d6 else "-"
+        return f"{self.d6.high/100}元" if self.d6 else "-"
 
     @property
     def d9_high(self) -> str:
-        return f'{self.d9.high/100}元' if self.d9 else "-"
+        return f"{self.d9.high/100}元" if self.d9 else "-"
 
     @property
     def d12_high(self) -> str:
-        return f'{self.d12.high/100}元' if self.d12 else "-"
+        return f"{self.d12.high/100}元" if self.d12 else "-"
 
 
 class Days(IntEnum):
@@ -123,7 +122,7 @@ _history = {}
 
 
 def load_database():
-    '''读取数据库'''
+    """读取数据库"""
     global _database, _history, _database_dirty
     try:
         if _database:
@@ -131,15 +130,17 @@ def load_database():
             return True
         _database_dirty = False
         _database = GetScriptConfig("pupu_buy.json")
-        _history = json_codec.decode(_database.get_value_2("history") or {} if _database else {},
-                                     dict[str, ProductHistory])
+        _history = json_codec.decode(
+            _database.get_value_2("history") or {} if _database else {},
+            dict[str, ProductHistory],
+        )
         return True
     except BaseException:
         return False
 
 
 def save_database():
-    '''保存数据库'''
+    """保存数据库"""
     global _database, _history, _database_dirty
     if _database and _database_dirty:
         try:
@@ -151,13 +152,12 @@ def save_database():
 
 
 def RecordPrice(p: PProduct) -> bool:
-    '''记录商品价格'''
+    """记录商品价格"""
     # TODO 改用sqlite3详细记录
     global _database, _history, _database_dirty
     dirty = False
     now = PClient.TryGetServerTime() or 0
-    history_record = _history.get(
-        p.store_product_id) or ProductHistory()
+    history_record = _history.get(p.store_product_id) or ProductHistory()
 
     if history_record.name is None or history_record.name != p.name:
         # 230208: 商品名称也需要记录 方便调试
@@ -167,26 +167,28 @@ def RecordPrice(p: PProduct) -> bool:
     if history_record.lowest is None or history_record.highest is None:
         dirty = True
 
-    if history_record.lowest_price is None \
-            or p.price < history_record.lowest_price:
+    if history_record.lowest_price is None or p.price < history_record.lowest_price:
         history_record.lowest = p.price
         dirty = True
-    if history_record.highest_price is None \
-            or p.price > history_record.highest_price:
+    if history_record.highest_price is None or p.price > history_record.highest_price:
         history_record.highest = p.price
         dirty = True
 
-    STAGES: list = [("d12", Days.DAYS_12, None), ("d9", Days.DAYS_9, "d12"),
-                    ("d6", Days.DAYS_6, "d9"), ("d3", Days.DAYS_3, "d6")]
+    STAGES: list = [
+        ("d12", Days.DAYS_12, None),
+        ("d9", Days.DAYS_9, "d12"),
+        ("d6", Days.DAYS_6, "d9"),
+        ("d3", Days.DAYS_3, "d6"),
+    ]
 
     # 根据历史价格的最后更新日期进行重新归类
     for f, days, t in STAGES:
-        record = cast(Optional[PriceRecord],
-                      getattr(history_record, f, None))
+        record = cast(Optional[PriceRecord], getattr(history_record, f, None))
         if record is None:
             continue
-        time_diff = date.fromtimestamp(now / 1000) \
-            - date.fromtimestamp(record.create_time / 1000)
+        time_diff = date.fromtimestamp(now / 1000) - date.fromtimestamp(
+            record.create_time / 1000
+        )
         if time_diff.days < days:
             # 按自然日计算
             continue
@@ -195,8 +197,9 @@ def RecordPrice(p: PProduct) -> bool:
         setattr(history_record, f, None)
         dirty = True
 
-    record = history_record.d3 or PriceRecord(create_time=now,
-                                              low=p.price, high=p.price)
+    record = history_record.d3 or PriceRecord(
+        create_time=now, low=p.price, high=p.price
+    )
     if p.price < record.low:
         record.low = p.price
         record.update_time = now
@@ -217,7 +220,7 @@ def RecordPrice(p: PProduct) -> bool:
 
 
 def OutputHistoryPrice(p: PProduct) -> list[str]:
-    '''
+    """
     输出商品的历史价格详情
 
     ---
@@ -225,19 +228,27 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
         当前价格: 7.99元
         历史价格: 1.99元~18.99元
         最近低价: 7.00, 15.00, 10.00, 1.00
-    '''
+    """
     global _database, _history, _database_dirty
     msg: list[str] = []
-    history_record = cast(Optional[ProductHistory],
-                          _history.get(p.store_product_id))
+    history_record = cast(Optional[ProductHistory], _history.get(p.store_product_id))
     if not history_record:
         # 无记录
         return msg
     log(f"- {p.name}  ", msg)
     log(f"  当前价格: {p.price/100}元  ", msg)
-    if history_record.lowest_price is not None and history_record.highest_price is not None:
-        log(f"  历史价格: {history_record.lowest_price/100}元~{history_record.highest_price/100}元  ", msg)
-    log(f"  最近低价: {history_record.d3_low}, {history_record.d6_low}, {history_record.d9_low}, {history_record.d12_low}  ", msg)
+    if (
+        history_record.lowest_price is not None
+        and history_record.highest_price is not None
+    ):
+        log(
+            f"  历史价格: {history_record.lowest_price/100}元~{history_record.highest_price/100}元  ",
+            msg,
+        )
+    log(
+        f"  最近低价: {history_record.d3_low}, {history_record.d6_low}, {history_record.d9_low}, {history_record.d12_low}  ",
+        msg,
+    )
     if time := history_record.d3.update_time if history_record.d3 else None:
         d = datetime.fromtimestamp(time / 1000).strftime("%Y-%m-%d %H:%M:%S")
         log(f"  变动时间: {d}  ", msg)
@@ -248,7 +259,7 @@ def OutputHistoryPrice(p: PProduct) -> list[str]:
 
 
 async def __RecordCollectionsPrice(check_item):
-    '''记录收藏列表中商品的价格'''
+    """记录收藏列表中商品的价格"""
     msg: list[str] = []
     try:
         history_cfg = check_item.get("history", {})
@@ -262,10 +273,12 @@ async def __RecordCollectionsPrice(check_item):
             raise SystemExit("refresh_token 配置有误")
 
         async with PClient(device_id, refresh_token) as api:
-            result = await api.InitializeToken(check_item.get("addr_filter"), force_update_receiver=False)
+            result = await api.InitializeToken(
+                check_item.get("addr_filter"), force_update_receiver=False
+            )
             if isinstance(result, ApiResults.Error):
                 if api.nickname:
-                    log(f'账号: {api.nickname}', msg)
+                    log(f"账号: {api.nickname}", msg)
                 log(result, msg)
                 raise StopIteration
 
@@ -275,7 +288,7 @@ async def __RecordCollectionsPrice(check_item):
             count = 0
             page = 1  # 从第一页开始拉取
             changed_msg: list[str] = []
-            while (True):
+            while True:
                 collections = await api.GetProductCollections(page, PAGE_SIZE)
                 if isinstance(collections, ApiResults.Error):
                     log(collections, msg)
@@ -285,21 +298,23 @@ async def __RecordCollectionsPrice(check_item):
                     # 记录价格
                     if RecordPrice(p):
                         changed_msg.extend(OutputHistoryPrice(p))
-                if count >= collections.total_count \
-                        or collections.total_count < PAGE_SIZE:
+                if (
+                    count >= collections.total_count
+                    or collections.total_count < PAGE_SIZE
+                ):
                     # 不知朴朴怎么想的 空列表还会下发一个不为零的total_count
                     break
                 page += 1
 
             if changed_msg:
-                log(f'账号: {api.nickname}', msg)
+                log(f"账号: {api.nickname}", msg)
                 log("以下商品价格有变化:", msg)
                 msg.extend(changed_msg)
 
     except StopIteration:
         pass
     except Exception:
-        log(f'失败: 请检查接口 {format_exc()}', msg)
+        log(f"失败: 请检查接口 {format_exc()}", msg)
     finally:
         save_database()
     return "\n".join(msg)

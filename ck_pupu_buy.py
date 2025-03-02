@@ -240,18 +240,53 @@ class PUPU:
             )
         return goods_list
 
+    @classmethod
+    async def __serverJ(cls, key: str, title: str, content: str):
+        """通过 ServerJ 推送消息"""
+        msg: list[str] = []
+        log("serverJ 服务启动")
+
+        data = {"text": title, "desp": content.replace("\n", "\n\n")}
+        if key.startswith("SCT"):
+            url = f"https://sctapi.ftqq.com/{key}.send"
+        else:
+            url = f"https://sc.ftqq.com/${key}.send"
+
+        async with ClientSession(
+            raise_for_status=True, timeout=ClientTimeout(total=15)
+        ) as session:
+            async with session.post(url, data=data, ssl=False) as req:
+                datas = await req.json()
+                if datas.get("errno") == 0 or datas.get("code") == 0:
+                    log("serverJ 推送成功!", msg)
+                elif datas.get("code") == 40001:
+                    log("serverJ 推送失败! PUSH_KEY 错误。", msg)
+                else:
+                    log(f'serverJ 推送失败! 错误码：{datas.get("message")}', msg)
+        return msg
+
+    @classmethod
+    async def __pushDeer(cls, key: str, title: str, content: str):
+        """通过 PushDeer 推送消息"""
+        msg: list[str] = []
+        log("PushDeer 服务启动")
+        pushdeer = PushDeer(pushkey=key)
+        if pushdeer.send_text(title, desp=content.replace("\n", "\n\n")) == True:
+            log("PushDeer 推送成功!", msg)
+        else:
+            log("PushDeer 推送失败!", msg)
+        return msg
+
     async def send(self, title: str, content: str):
         """推送消息"""
         if not self._push_key:
             return []
-        msg: list[str] = []
-        log("PushDeer 服务启动")
-        pushdeer = PushDeer(pushkey=self._push_key)
-        if pushdeer.send_text(title, desp=content.replace("\n", "\n\n")) == True:
-            log("推送成功!", msg)
+        if self._push_key.startswith("SC"):
+            return self.__serverJ(self._push_key, title, content)
+        elif self._push_key.startswith("PD"):
+            return self.__pushDeer(self._push_key, title, content)
         else:
-            log("推送失败!", msg)
-        return msg
+            return []
 
 
 @check(run_script_name="朴朴抢购", run_script_expression="pupu", interval_max=0)

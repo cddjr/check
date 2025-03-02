@@ -13,7 +13,7 @@ goods 检测商品收藏列表中的哪些商品 数组对象
     quantity 抢购数量(可选)
 buy 如果降价是否抢购 默认False只发送降价通知
 addr_filter 限定用哪个收货地址(可选) 默认用最近下单地址
-push_key 降价时用的ServerJ推送key(可选)
+push_key 降价时用的PushDeer推送key(可选)
 """
 import asyncio
 import sys
@@ -27,6 +27,7 @@ from pupu_types import *
 from utils import check, log, aio_randomSleep
 
 from aiohttp import ClientSession, ClientTimeout
+from pypushdeer import PushDeer
 
 assert sys.version_info >= (3, 9)
 
@@ -162,7 +163,7 @@ class PUPU:
             if price_reduction <= 0:
                 # 第1次检测没有降价 等待片刻
                 await asyncio.sleep(1.0)
-                # 开始第2次检测 总共3次
+                # 开始第2次检测 总共2次
                 retry = 2
                 while True:
                     log(f"第{retry}次尝试...")
@@ -176,7 +177,7 @@ class PUPU:
                         # 存在降价商品 不再尝试检测
                         break
                     retry += 1
-                    if retry > 3:
+                    if retry > 2:
                         break
                     await asyncio.sleep(1.0)
             if order_items:
@@ -209,7 +210,8 @@ class PUPU:
                 else:
                     log(f"订单创建成功 {order_result.id}", msg)
                     log(f"当前服务器时间: {PClient.TryGetServerTime() or 0}")
-                    msg += await self.ServerJ("朴朴降价了", f"{order_result.id}")
+                    name = self.check_item.get("name") or ""
+                    msg += await self.send("朴朴降价了", f"{name} {order_result.id}")
             elif price_reduction <= 0:
                 pass  # log('无降价', msg)
             else:
@@ -238,30 +240,17 @@ class PUPU:
             )
         return goods_list
 
-    async def ServerJ(self, title: str, content: str):
-        """通过 ServerJ 推送消息"""
+    async def send(self, title: str, content: str):
+        """推送消息"""
         if not self._push_key:
             return []
         msg: list[str] = []
-        log("serverJ 服务启动")
-
-        data = {"text": title, "desp": content.replace("\n", "\n\n")}
-        if self._push_key.index("SCT") != -1:
-            url = f"https://sctapi.ftqq.com/{self._push_key}.send"
+        log("PushDeer 服务启动")
+        pushdeer = PushDeer(pushkey=self._push_key)
+        if pushdeer.send_text(title, desp=content.replace("\n", "\n\n")) == True:
+            log("推送成功!", msg)
         else:
-            url = f"https://sc.ftqq.com/${self._push_key}.send"
-
-        async with ClientSession(
-            raise_for_status=True, timeout=ClientTimeout(total=15)
-        ) as session:
-            async with session.post(url, data=data, ssl=False) as req:
-                datas = await req.json()
-                if datas.get("errno") == 0 or datas.get("code") == 0:
-                    log("serverJ 推送成功!", msg)
-                elif datas.get("code") == 40001:
-                    log("serverJ 推送失败! PUSH_KEY 错误。", msg)
-                else:
-                    log(f'serverJ 推送失败! 错误码：{datas.get("message")}', msg)
+            log("推送失败!", msg)
         return msg
 
 

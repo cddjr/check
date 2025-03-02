@@ -19,7 +19,7 @@ assert py_version >= (3, 9)
 def pip_install():
     print("正在安装依赖")
     os.system(
-        "pip3 install requests rsa tomli tomli_w beautifulsoup4 fasteners aiohttp aiohttp_retry typing_extensions"
+        "pip3 install requests rsa tomli tomli_w beautifulsoup4 fasteners aiohttp aiohttp_retry typing_extensions pypushdeer"
     )
     os.system("pip3 install git+http://github.site/cddjr/json_codec.git --user")
 
@@ -30,6 +30,7 @@ try:
     import json_codec
     import aiohttp
     import aiohttp_retry
+    import pypushdeer
 
     from fasteners.process_lock import InterProcessReaderWriterLock
 
@@ -41,6 +42,7 @@ except ModuleNotFoundError:
     import json_codec
     import aiohttp
     import aiohttp_retry
+    import pypushdeer
     from fasteners.process_lock import InterProcessReaderWriterLock
 
     from checksendNotify import send

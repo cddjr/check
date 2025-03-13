@@ -282,9 +282,9 @@ class PUPU:
         if not self._push_key:
             return []
         if self._push_key.startswith("SC"):
-            return self.__serverJ(self._push_key, title, content)
+            return await self.__serverJ(self._push_key, title, content)
         elif self._push_key.startswith("PD"):
-            return self.__pushDeer(self._push_key, title, content)
+            return await self.__pushDeer(self._push_key, title, content)
         else:
             return []
 

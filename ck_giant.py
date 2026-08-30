@@ -31,6 +31,7 @@ class GIANT:
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "zh-CN,zh-Hans;q=0.9",
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 _giantapp/3.2.0",
+            "token": self.token,
             "Referer": "https://found.giant.com.cn/",
             "Connection": "keep-alive"
         }
@@ -80,8 +81,11 @@ class GIANT:
         msg = []
         try:
             self.user_id: str = self.check_item.get("user_id", "").strip()
+            self.token: str = self.check_item.get("token", "").strip()
             if len(self.user_id) < 4:
                 raise SystemExit("user_id 配置有误")
+            if len(self.token) < 32:
+                raise SystemExit("token 配置有误")
             msg1, repeated1 = self.sign(type=1)  # 每日签到
             randomSleep()
             msg2, repeated2 = self.sign(type=2)  # 每日分享
